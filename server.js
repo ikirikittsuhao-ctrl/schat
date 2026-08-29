@@ -73,6 +73,9 @@ app.use(helmet({
         "https://cdnjs.cloudflare.com",
         "https://unpkg.com"
       ],
+      scriptSrcAttr: [
+        "'unsafe-inline'"
+      ],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
       connectSrc: ["'self'", "ws:", "wss:"],
       camera: ["'self'"],
