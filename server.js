@@ -494,7 +494,7 @@ app.get("/api/rooms/:roomId/messages",requireAuth,async(req,res)=>{
   try{
     const roomId=req.params.roomId;
 
-    if (!(await isRoomMember(req.user.id, roomId))) {
+    if(!(await isRoomMember(req.user.id,roomId)){
       return res.status(403).json({error:"このルームへのアクセス権がありません。"});
     }
 
