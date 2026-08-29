@@ -1,0 +1,6 @@
+ALTER TABLE room_members
+ADD COLUMN IF NOT EXISTS last_read_at TIMESTAMPTZ DEFAULT NOW();
+
+UPDATE room_members
+SET last_read_at = NOW()
+WHERE last_read_at IS NULL;
