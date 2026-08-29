@@ -5,186 +5,2103 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
 <title>schat</title>
+
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="/socket.io/socket.io.js"></script>
+
 <style>
-:root{--bg:#f5f7fb;--surface:#fff;--surface2:#f0f3f8;--border:#e3e7ef;--text:#172033;--muted:#728096;--primary:#2563eb;--primary2:#1d4ed8;--danger:#dc2626;--shadow:0 10px 35px rgba(20,35,60,.08)}
-*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;background:var(--bg);color:var(--text);height:100dvh;overflow:hidden}button,input{font:inherit}
-button{cursor:pointer}.hidden{display:none!important}
-.app{height:100dvh;max-width:1280px;margin:auto;display:flex;background:var(--surface);box-shadow:var(--shadow)}
-.sidebar{width:350px;border-right:1px solid var(--border);display:flex;flex-direction:column;background:#fff}
-.topbar{height:68px;padding:0 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
-.brand{font-size:21px;font-weight:800;letter-spacing:-.5px}.brand i{color:var(--primary);margin-right:7px}.top-actions{display:flex;gap:7px}
-.icon{width:38px;height:38px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:17px}.icon:hover{background:var(--surface2);color:var(--primary)}
-.search{padding:11px 13px;border-bottom:1px solid var(--border)}.search input{width:100%;border:0;background:var(--surface2);padding:10px 13px;border-radius:10px;outline:0}
-.plan{margin:12px;padding:10px 12px;border-radius:10px;background:#eff6ff;color:#1d4ed8;font-size:12px}
-.rooms{flex:1;overflow:auto}.room{display:flex;gap:11px;padding:12px 15px;align-items:center;border-bottom:1px solid #f0f2f6;cursor:pointer}.room:hover,.room.active{background:#f4f7fc}.avatar{width:44px;height:44px;border-radius:50%;background:#e8eefc;color:var(--primary);display:grid;place-items:center;flex:none}.room-name{font-weight:650;font-size:14px}.room-meta{font-size:11px;color:var(--muted);margin-top:3px}.nav{height:65px;border-top:1px solid var(--border);display:flex}.nav button{flex:1;border:0;background:#fff;color:var(--muted);font-size:11px}.nav button i{display:block;font-size:18px;margin-bottom:4px}.nav button.active{color:var(--primary)}
-.main{flex:1;min-width:0;display:flex;flex-direction:column;background:#fbfcfe}.empty{height:100%;display:grid;place-items:center;color:var(--muted);text-align:center}.empty i{font-size:50px;color:#c9d2e3;margin-bottom:12px}
-.chat-head{height:68px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:10px}.chat-title{font-weight:750}.back{display:none}
-.messages{flex:1;overflow:auto;padding:22px;display:flex;flex-direction:column;gap:9px}.msg{max-width:min(70%,620px);padding:10px 13px;border-radius:15px;background:#fff;border:1px solid var(--border);line-height:1.5;font-size:14px}.msg.me{align-self:flex-end;background:var(--primary);color:#fff;border-color:var(--primary);border-bottom-right-radius:5px}.msg.other{align-self:flex-start;border-bottom-left-radius:5px}.msg small{display:block;font-size:10px;opacity:.65;margin-top:3px}
-.composer{padding:13px 16px;border-top:1px solid var(--border);background:#fff;display:flex;gap:8px}.composer input{flex:1;min-width:0;border:1px solid var(--border);border-radius:22px;padding:11px 15px;outline:0;background:#f7f9fc}.send{width:45px;border:0;border-radius:50%;background:var(--primary);color:#fff}.send:hover{background:var(--primary2)}
-.panel{padding:22px;overflow:auto}.panel h2{margin-bottom:16px}.card{background:#fff;border:1px solid var(--border);border-radius:15px;padding:17px;margin-bottom:13px;box-shadow:0 4px 18px rgba(30,50,80,.04)}.profile{display:flex;gap:13px;align-items:center}.big-avatar{width:62px;height:62px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#60a5fa);color:#fff;display:grid;place-items:center;font-size:25px}.muted{color:var(--muted);font-size:12px}.field{margin-top:12px}.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}.field input{width:100%;border:1px solid var(--border);border-radius:9px;padding:10px;outline:0}.btn{border:0;border-radius:9px;padding:9px 13px;background:var(--primary);color:#fff;font-weight:650}.btn.secondary{background:#edf1f7;color:#34415a}.btn.danger{background:#fee2e2;color:#b91c1c}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
-.modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:grid;place-items:center;padding:15px;z-index:20}.modal-box{width:min(460px,100%);max-height:90dvh;overflow:auto;background:#fff;border-radius:18px;padding:20px;box-shadow:0 20px 70px rgba(0,0,0,.18)}.modal-box h3{margin-bottom:15px}.modal-box input{width:100%;padding:11px;border:1px solid var(--border);border-radius:9px;outline:0;margin-bottom:10px}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:13px}.qr{background:#fff;padding:12px;display:grid;place-items:center;margin:10px auto;border-radius:10px;width:max-content}
-.auth{position:fixed;inset:0;background:linear-gradient(135deg,#eef4ff,#f8fafc);display:grid;place-items:center;padding:18px;z-index:100}.auth-card{width:min(410px,100%);background:#fff;border:1px solid var(--border);border-radius:20px;padding:25px;box-shadow:var(--shadow)}.auth-card h1{margin-bottom:5px}.auth-card p{color:var(--muted);font-size:13px;margin-bottom:18px}.auth-card input{width:100%;padding:12px;margin-bottom:10px;border:1px solid var(--border);border-radius:10px;outline:0}.auth-card .btn{width:100%;padding:12px}.auth-switch{text-align:center;margin-top:13px;font-size:12px;color:var(--muted)}.auth-switch button{border:0;background:none;color:var(--primary)}
-#reader{width:100%}
-@media(max-width:800px){.app{width:100%;}.sidebar{width:100%;}.main{position:fixed;inset:0;transform:translateX(100%);transition:.22s;z-index:10}.main.open{transform:translateX(0)}.back{display:block}.messages{padding:15px}.msg{max-width:82%}}
-@media(min-width:801px){.mobile-back{display:none!important}}
+:root{
+  --bg:#f5f7fb;
+  --surface:#fff;
+  --surface2:#f0f3f8;
+  --border:#e3e7ef;
+  --text:#172033;
+  --muted:#728096;
+  --primary:#2563eb;
+  --primary2:#1d4ed8;
+  --danger:#dc2626;
+  --shadow:0 10px 35px rgba(20,35,60,.08)
+}
+
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0
+}
+
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  height:100dvh;
+  overflow:hidden
+}
+
+button,input{
+  font:inherit
+}
+
+button{
+  cursor:pointer
+}
+
+.hidden{
+  display:none!important
+}
+
+.app{
+  height:100dvh;
+  max-width:1280px;
+  margin:auto;
+  display:flex;
+  background:var(--surface);
+  box-shadow:var(--shadow)
+}
+
+.sidebar{
+  width:350px;
+  border-right:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  background:#fff
+}
+
+.topbar{
+  height:68px;
+  padding:0 18px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border-bottom:1px solid var(--border)
+}
+
+.brand{
+  font-size:21px;
+  font-weight:800;
+  letter-spacing:-.5px
+}
+
+.brand i{
+  color:var(--primary);
+  margin-right:7px
+}
+
+.top-actions{
+  display:flex;
+  gap:7px
+}
+
+.icon{
+  width:38px;
+  height:38px;
+  border:0;
+  border-radius:10px;
+  background:transparent;
+  color:var(--muted);
+  font-size:17px
+}
+
+.icon:hover{
+  background:var(--surface2);
+  color:var(--primary)
+}
+
+.search{
+  padding:11px 13px;
+  border-bottom:1px solid var(--border)
+}
+
+.search input{
+  width:100%;
+  border:0;
+  background:var(--surface2);
+  padding:10px 13px;
+  border-radius:10px;
+  outline:0
+}
+
+.plan{
+  margin:12px;
+  padding:10px 12px;
+  border-radius:10px;
+  background:#eff6ff;
+  color:#1d4ed8;
+  font-size:12px
+}
+
+.rooms{
+  flex:1;
+  overflow:auto
+}
+
+.room{
+  display:flex;
+  gap:11px;
+  padding:12px 15px;
+  align-items:center;
+  border-bottom:1px solid #f0f2f6;
+  cursor:pointer
+}
+
+.room:hover,
+.room.active{
+  background:#f4f7fc
+}
+
+.avatar{
+  width:44px;
+  height:44px;
+  border-radius:50%;
+  background:#e8eefc;
+  color:var(--primary);
+  display:grid;
+  place-items:center;
+  flex:none
+}
+
+.room-name{
+  font-weight:650;
+  font-size:14px
+}
+
+.room-meta{
+  font-size:11px;
+  color:var(--muted);
+  margin-top:3px
+}
+
+.nav{
+  height:65px;
+  border-top:1px solid var(--border);
+  display:flex
+}
+
+.nav button{
+  flex:1;
+  border:0;
+  background:#fff;
+  color:var(--muted);
+  font-size:11px
+}
+
+.nav button i{
+  display:block;
+  font-size:18px;
+  margin-bottom:4px
+}
+
+.nav button.active{
+  color:var(--primary)
+}
+
+.main{
+  flex:1;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  background:#fbfcfe
+}
+
+.empty{
+  height:100%;
+  display:grid;
+  place-items:center;
+  color:var(--muted);
+  text-align:center
+}
+
+.empty i{
+  font-size:50px;
+  color:#c9d2e3;
+  margin-bottom:12px
+}
+
+.chat-head{
+  height:68px;
+  background:#fff;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  padding:0 18px;
+  gap:10px
+}
+
+.chat-title{
+  font-weight:750;
+  flex:1
+}
+
+.chat-actions{
+  display:flex;
+  gap:4px
+}
+
+.back{
+  display:none
+}
+
+.messages{
+  flex:1;
+  overflow:auto;
+  padding:22px;
+  display:flex;
+  flex-direction:column;
+  gap:9px
+}
+
+.msg{
+  max-width:min(70%,620px);
+  padding:10px 13px;
+  border-radius:15px;
+  background:#fff;
+  border:1px solid var(--border);
+  line-height:1.5;
+  font-size:14px
+}
+
+.msg.me{
+  align-self:flex-end;
+  background:var(--primary);
+  color:#fff;
+  border-color:var(--primary);
+  border-bottom-right-radius:5px
+}
+
+.msg.other{
+  align-self:flex-start;
+  border-bottom-left-radius:5px
+}
+
+.msg small{
+  display:block;
+  font-size:10px;
+  opacity:.65;
+  margin-top:3px
+}
+
+.composer{
+  padding:13px 16px;
+  border-top:1px solid var(--border);
+  background:#fff;
+  display:flex;
+  gap:8px
+}
+
+.composer input{
+  flex:1;
+  min-width:0;
+  border:1px solid var(--border);
+  border-radius:22px;
+  padding:11px 15px;
+  outline:0;
+  background:#f7f9fc
+}
+
+.send{
+  width:45px;
+  border:0;
+  border-radius:50%;
+  background:var(--primary);
+  color:#fff
+}
+
+.send:hover{
+  background:var(--primary2)
+}
+
+.panel{
+  padding:22px;
+  overflow:auto
+}
+
+.panel h2{
+  margin-bottom:16px
+}
+
+.card{
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:15px;
+  padding:17px;
+  margin-bottom:13px;
+  box-shadow:0 4px 18px rgba(30,50,80,.04)
+}
+
+.profile{
+  display:flex;
+  gap:13px;
+  align-items:center
+}
+
+.big-avatar{
+  width:62px;
+  height:62px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#2563eb,#60a5fa);
+  color:#fff;
+  display:grid;
+  place-items:center;
+  font-size:25px
+}
+
+.muted{
+  color:var(--muted);
+  font-size:12px
+}
+
+.field{
+  margin-top:12px
+}
+
+.field label{
+  display:block;
+  font-size:12px;
+  color:var(--muted);
+  margin-bottom:5px
+}
+
+.field input{
+  width:100%;
+  border:1px solid var(--border);
+  border-radius:9px;
+  padding:10px;
+  outline:0
+}
+
+.btn{
+  border:0;
+  border-radius:9px;
+  padding:9px 13px;
+  background:var(--primary);
+  color:#fff;
+  font-weight:650
+}
+
+.btn.secondary{
+  background:#edf1f7;
+  color:#34415a
+}
+
+.btn.danger{
+  background:#fee2e2;
+  color:#b91c1c
+}
+
+.btn.success{
+  background:#dcfce7;
+  color:#166534
+}
+
+.actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:13px
+}
+
+.invite-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:18px;
+  height:18px;
+  padding:0 5px;
+  border-radius:99px;
+  background:#2563eb;
+  color:#fff;
+  font-size:10px;
+  margin-left:4px
+}
+
+.invite-card{
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px;
+  margin-bottom:10px;
+  background:#fff
+}
+
+.invite-title{
+  font-weight:700;
+  font-size:14px
+}
+
+.invite-info{
+  font-size:12px;
+  color:var(--muted);
+  margin-top:4px
+}
+
+.modal{
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,.45);
+  display:grid;
+  place-items:center;
+  padding:15px;
+  z-index:20
+}
+
+.modal-box{
+  width:min(460px,100%);
+  max-height:90dvh;
+  overflow:auto;
+  background:#fff;
+  border-radius:18px;
+  padding:20px;
+  box-shadow:0 20px 70px rgba(0,0,0,.18)
+}
+
+.modal-box h3{
+  margin-bottom:15px
+}
+
+.modal-box input{
+  width:100%;
+  padding:11px;
+  border:1px solid var(--border);
+  border-radius:9px;
+  outline:0;
+  margin-bottom:10px
+}
+
+.modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  margin-top:13px
+}
+
+.qr{
+  background:#fff;
+  padding:12px;
+  display:grid;
+  place-items:center;
+  margin:10px auto;
+  border-radius:10px;
+  width:max-content
+}
+
+.auth{
+  position:fixed;
+  inset:0;
+  background:linear-gradient(135deg,#eef4ff,#f8fafc);
+  display:grid;
+  place-items:center;
+  padding:18px;
+  z-index:100
+}
+
+.auth-card{
+  width:min(410px,100%);
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:25px;
+  box-shadow:var(--shadow)
+}
+
+.auth-card h1{
+  margin-bottom:5px
+}
+
+.auth-card p{
+  color:var(--muted);
+  font-size:13px;
+  margin-bottom:18px
+}
+
+.auth-card input{
+  width:100%;
+  padding:12px;
+  margin-bottom:10px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  outline:0
+}
+
+.auth-card .btn{
+  width:100%;
+  padding:12px
+}
+
+.auth-switch{
+  text-align:center;
+  margin-top:13px;
+  font-size:12px;
+  color:var(--muted)
+}
+
+.auth-switch button{
+  border:0;
+  background:none;
+  color:var(--primary)
+}
+
+#reader{
+  width:100%
+}
+
+@media(max-width:800px){
+  .app{
+    width:100%
+  }
+
+  .sidebar{
+    width:100%
+  }
+
+  .main{
+    position:fixed;
+    inset:0;
+    transform:translateX(100%);
+    transition:.22s;
+    z-index:10
+  }
+
+  .main.open{
+    transform:translateX(0)
+  }
+
+  .back{
+    display:block
+  }
+
+  .messages{
+    padding:15px
+  }
+
+  .msg{
+    max-width:82%
+  }
+}
+
+@media(min-width:801px){
+  .mobile-back{
+    display:none!important
+  }
+}
 </style>
 </head>
+
 <body>
+
 <div id="auth" class="auth">
   <div class="auth-card">
-    <h1><i class="fa-solid fa-comments"></i> schat</h1>
-    <p id="authDesc">ユーザー名とパスワードでログイン</p>
-    <input id="authUser" autocomplete="username" placeholder="ユーザー名">
-    <input id="authPass" autocomplete="current-password" type="password" placeholder="パスワード">
-    <input id="authName" class="hidden" autocomplete="name" placeholder="表示名">
-    <button class="btn" id="authBtn">ログイン</button>
-    <div class="auth-switch"><span id="authSwitchText">アカウントを作成する</span> <button id="authSwitch">新規登録</button></div>
-    <div id="authError" class="muted" style="margin-top:10px;color:#dc2626"></div>
+    <h1>
+      <i class="fa-solid fa-comments"></i>
+      schat
+    </h1>
+
+    <p id="authDesc">
+      ユーザー名とパスワードでログイン
+    </p>
+
+    <input
+      id="authUser"
+      autocomplete="username"
+      placeholder="ユーザー名"
+    >
+
+    <input
+      id="authPass"
+      autocomplete="current-password"
+      type="password"
+      placeholder="パスワード"
+    >
+
+    <input
+      id="authName"
+      class="hidden"
+      autocomplete="name"
+      placeholder="表示名"
+    >
+
+    <button class="btn" id="authBtn">
+      ログイン
+    </button>
+
+    <div class="auth-switch">
+      <span id="authSwitchText">
+        アカウントを作成する
+      </span>
+
+      <button id="authSwitch">
+        新規登録
+      </button>
+    </div>
+
+    <div
+      id="authError"
+      class="muted"
+      style="margin-top:10px;color:#dc2626"
+    ></div>
   </div>
 </div>
 
 <div class="app">
+
   <aside class="sidebar">
-    <div class="topbar"><div class="brand"><i class="fa-solid fa-comments"></i>schat</div><div class="top-actions">
-      <button class="icon" title="フレンド追加" onclick="openFriend()"><i class="fa-solid fa-user-plus"></i></button>
-      <button class="icon" title="グループ作成" onclick="openGroup()"><i class="fa-solid fa-users"></i></button>
-    </div></div>
-    <div class="search"><input id="search" placeholder="チャットを検索"></div>
-    <div class="plan"><i class="fa-solid fa-shield-halved"></i> サーバー経由・セキュアモード</div>
-    <div id="rooms" class="rooms"></div>
-    <div class="nav">
-      <button id="navChat" class="active" onclick="tab('chat')"><i class="fa-solid fa-message"></i>チャット</button>
-      <button id="navFriends" onclick="tab('friends')"><i class="fa-solid fa-address-book"></i>フレンド</button>
-      <button id="navAccount" onclick="tab('account')"><i class="fa-solid fa-user"></i>アカウント</button>
+
+    <div class="topbar">
+      <div class="brand">
+        <i class="fa-solid fa-comments"></i>
+        schat
+      </div>
+
+      <div class="top-actions">
+
+        <button
+          class="icon"
+          title="フレンド追加"
+          onclick="openFriend()"
+        >
+          <i class="fa-solid fa-user-plus"></i>
+        </button>
+
+        <button
+          class="icon"
+          title="グループ作成"
+          onclick="openGroup()"
+        >
+          <i class="fa-solid fa-users"></i>
+        </button>
+
+      </div>
     </div>
+
+    <div class="search">
+      <input
+        id="search"
+        placeholder="チャットを検索"
+      >
+    </div>
+
+    <div class="plan">
+      <i class="fa-solid fa-shield-halved"></i>
+      サーバー経由・セキュアモード
+    </div>
+
+    <div id="rooms" class="rooms"></div>
+
+    <div class="nav">
+
+      <button
+        id="navChat"
+        class="active"
+        onclick="tab('chat')"
+      >
+        <i class="fa-solid fa-message"></i>
+        チャット
+      </button>
+
+      <button
+        id="navFriends"
+        onclick="tab('friends')"
+      >
+        <i class="fa-solid fa-address-book"></i>
+        フレンド
+        <span id="inviteBadge" class="invite-badge hidden">0</span>
+      </button>
+
+      <button
+        id="navAccount"
+        onclick="tab('account')"
+      >
+        <i class="fa-solid fa-user"></i>
+        アカウント
+      </button>
+
+    </div>
+
   </aside>
+
   <main id="main" class="main">
-    <div id="empty" class="empty"><div><i class="fa-regular fa-comments"></i><p>チャットを選択してください</p></div></div>
-    <section id="chatView" class="hidden" style="height:100%;display:flex;flex-direction:column">
-      <div class="chat-head"><button class="icon back mobile-back" onclick="closeMain()"><i class="fa-solid fa-arrow-left"></i></button><div id="chatTitle" class="chat-title">チャット</div></div>
+
+    <div id="empty" class="empty">
+      <div>
+        <i class="fa-regular fa-comments"></i>
+        <p>チャットを選択してください</p>
+      </div>
+    </div>
+
+    <section
+      id="chatView"
+      class="hidden"
+      style="height:100%;display:flex;flex-direction:column"
+    >
+
+      <div class="chat-head">
+
+        <button
+          class="icon back mobile-back"
+          onclick="closeMain()"
+        >
+          <i class="fa-solid fa-arrow-left"></i>
+        </button>
+
+        <div id="chatTitle" class="chat-title">
+          チャット
+        </div>
+
+        <div id="chatActions" class="chat-actions"></div>
+
+      </div>
+
       <div id="messages" class="messages"></div>
-      <form id="composer" class="composer"><input id="message" maxlength="2000" placeholder="メッセージを入力"><button class="send"><i class="fa-solid fa-paper-plane"></i></button></form>
+
+      <form id="composer" class="composer">
+
+        <input
+          id="message"
+          maxlength="2000"
+          placeholder="メッセージを入力"
+        >
+
+        <button class="send">
+          <i class="fa-solid fa-paper-plane"></i>
+        </button>
+
+      </form>
+
     </section>
-    <section id="friendsView" class="panel hidden"><h2>フレンド</h2><div class="actions"><button class="btn" onclick="openFriend()">フレンド追加</button><button class="btn secondary" onclick="openQR()">自分のQR</button></div><div id="friendsList" style="margin-top:14px"></div></section>
-    <section id="accountView" class="panel hidden"><h2>アカウント</h2><div class="card"><div class="profile"><div class="big-avatar"><i class="fa-solid fa-user"></i></div><div><b id="meName"></b><div id="meUser" class="muted"></div></div></div><div class="field"><label>表示名</label><input id="displayName" maxlength="40"></div><div class="actions"><button class="btn" onclick="saveProfile()">更新</button><button class="btn secondary" onclick="openQR()">QRコード</button><button class="btn danger" onclick="logout()">ログアウト</button></div></div></section>
+
+    <section
+      id="friendsView"
+      class="panel hidden"
+    >
+
+      <h2>フレンド</h2>
+
+      <div class="actions">
+
+        <button
+          class="btn"
+          onclick="openFriend()"
+        >
+          フレンド追加
+        </button>
+
+        <button
+          class="btn secondary"
+          onclick="openQR()"
+        >
+          自分のQR
+        </button>
+
+      </div>
+
+      <div
+        id="invitesArea"
+        style="margin-top:20px"
+      ></div>
+
+      <div
+        id="friendsList"
+        style="margin-top:14px"
+      ></div>
+
+    </section>
+
+    <section
+      id="accountView"
+      class="panel hidden"
+    >
+
+      <h2>アカウント</h2>
+
+      <div class="card">
+
+        <div class="profile">
+
+          <div class="big-avatar">
+            <i class="fa-solid fa-user"></i>
+          </div>
+
+          <div>
+            <b id="meName"></b>
+            <div id="meUser" class="muted"></div>
+          </div>
+
+        </div>
+
+        <div class="field">
+
+          <label>表示名</label>
+
+          <input
+            id="displayName"
+            maxlength="40"
+          >
+
+        </div>
+
+        <div class="actions">
+
+          <button
+            class="btn"
+            onclick="saveProfile()"
+          >
+            更新
+          </button>
+
+          <button
+            class="btn secondary"
+            onclick="openQR()"
+          >
+            QRコード
+          </button>
+
+          <button
+            class="btn danger"
+            onclick="logout()"
+          >
+            ログアウト
+          </button>
+
+        </div>
+
+      </div>
+
+    </section>
+
   </main>
+
 </div>
 
-<div id="modal" class="modal hidden"><div id="modalBox" class="modal-box"></div></div>
+<div id="modal" class="modal hidden">
+  <div id="modalBox" class="modal-box"></div>
+</div>
 
 <script>
-let me=null, rooms=[], activeRoom=null, socket=null, scanner=null, registerMode=false;
+let me=null;
+let rooms=[];
+let activeRoom=null;
+let socket=null;
+let scanner=null;
+let registerMode=false;
+let qrProcessing=false;
 
 const $=id=>document.getElementById(id);
+
 async function api(url,opts={}){
-  const r=await fetch(url,{credentials:"include",headers:{"Content-Type":"application/json",...(opts.headers||{})},...opts});
+  const r=await fetch(url,{
+    credentials:"include",
+    headers:{
+      "Content-Type":"application/json",
+      ...(opts.headers||{})
+    },
+    ...opts
+  });
+
   const d=await r.json().catch(()=>({}));
-  if(!r.ok) throw new Error(d.error||"通信エラー");
+
+  if(!r.ok){
+    throw new Error(d.error||"通信エラー");
+  }
+
   return d;
 }
-function escapeHTML(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
-function showAuthError(e){$("authError").textContent=e.message||String(e);}
-function setAuthMode(reg){
-  registerMode=reg;$("authName").classList.toggle("hidden",!reg);$("authBtn").textContent=reg?"アカウント作成":"ログイン";
-  $("authDesc").textContent=reg?"新しいschatアカウントを作成":"ユーザー名とパスワードでログイン";
-  $("authSwitchText").textContent=reg?"既にアカウントがありますか？":"アカウントを作成する";
-  $("authSwitch").textContent=reg?"ログイン":"新規登録";
+
+function escapeHTML(s){
+  return String(s).replace(
+    /[&<>"']/g,
+    m=>({
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#39;"
+    }[m])
+  );
 }
-$("authSwitch").onclick=()=>setAuthMode(!registerMode);
+
+function showAuthError(e){
+  $("authError").textContent=e.message||String(e);
+}
+
+function setAuthMode(reg){
+  registerMode=reg;
+
+  $("authName").classList.toggle(
+    "hidden",
+    !reg
+  );
+
+  $("authBtn").textContent=
+    reg
+      ? "アカウント作成"
+      : "ログイン";
+
+  $("authDesc").textContent=
+    reg
+      ? "新しいschatアカウントを作成"
+      : "ユーザー名とパスワードでログイン";
+
+  $("authSwitchText").textContent=
+    reg
+      ? "既にアカウントがありますか？"
+      : "アカウントを作成する";
+
+  $("authSwitch").textContent=
+    reg
+      ? "ログイン"
+      : "新規登録";
+}
+
+$("authSwitch").onclick=()=>{
+  setAuthMode(!registerMode);
+};
+
 $("authBtn").onclick=async()=>{
   try{
+
     $("authError").textContent="";
-    const body={username:$("authUser").value,password:$("authPass").value};
-    if(registerMode) body.displayName=$("authName").value;
-    const d=await api(registerMode?"/api/auth/register":"/api/auth/login",{method:"POST",body:JSON.stringify(body)});
-    me=d.user; await startApp();
-  }catch(e){showAuthError(e)}
+
+    const body={
+      username:$("authUser").value,
+      password:$("authPass").value
+    };
+
+    if(registerMode){
+      body.displayName=$("authName").value;
+    }
+
+    const d=await api(
+      registerMode
+        ? "/api/auth/register"
+        : "/api/auth/login",
+      {
+        method:"POST",
+        body:JSON.stringify(body)
+      }
+    );
+
+    me=d.user;
+
+    await startApp();
+
+  }catch(e){
+    showAuthError(e);
+  }
 };
-$("authPass").addEventListener("keydown",e=>{if(e.key==="Enter")$("authBtn").click()});
+
+$("authPass").addEventListener(
+  "keydown",
+  e=>{
+    if(e.key==="Enter"){
+      $("authBtn").click();
+    }
+  }
+);
 
 async function boot(){
-  try{const d=await api("/api/auth/me");me=d.user;await startApp()}catch{setAuthMode(false)}
+
+  try{
+
+    const d=await api(
+      "/api/auth/me"
+    );
+
+    me=d.user;
+
+    await startApp();
+
+  }catch{
+
+    setAuthMode(false);
+  }
 }
+
 async function startApp(){
+
   $("auth").classList.add("hidden");
-  $("meName").textContent=me.display_name;$("meUser").textContent="@"+me.username;$("displayName").value=me.display_name;
-  connectSocket();await loadRooms();await loadFriends();
+
+  $("meName").textContent=
+    me.display_name;
+
+  $("meUser").textContent=
+    "@"+me.username;
+
+  $("displayName").value=
+    me.display_name;
+
+  connectSocket();
+
+  await loadRooms();
+  await loadFriends();
+  await loadInvites();
 }
+
 function connectSocket(){
-  socket=io({withCredentials:true});
-  socket.on("connect_error",()=>{});
-  socket.on("message:new",m=>{if(activeRoom&&m.room_id===activeRoom.id)appendMessage(m,true);});
-  socket.on("rooms:changed",()=>loadRooms());
-  socket.on("room:changed",()=>loadRooms());
+
+  socket=io({
+    withCredentials:true
+  });
+
+  socket.on(
+    "connect_error",
+    ()=>{}
+  );
+
+  socket.on(
+    "message:new",
+    m=>{
+      if(
+        activeRoom &&
+        m.room_id===activeRoom.id
+      ){
+        appendMessage(m,true);
+      }
+    }
+  );
+
+  socket.on(
+    "rooms:changed",
+    ()=>{
+      loadRooms();
+    }
+  );
+
+  socket.on(
+    "room:changed",
+    ()=>{
+      loadRooms();
+    }
+  );
+
+  socket.on(
+    "invite:new",
+    async invite=>{
+      await loadInvites();
+
+      if(
+        invite &&
+        invite.room &&
+        activeRoom &&
+        invite.room.id===activeRoom.id
+      ){
+        renderChatActions();
+      }
+
+      if(
+        Notification &&
+        Notification.permission==="granted"
+      ){
+        try{
+          new Notification(
+            "schat - グループ招待",
+            {
+              body:
+                (invite.inviter?.display_name||"ユーザー")+
+                "から「"+
+                (invite.room?.name||"グループ")+
+                "」への招待が届きました。"
+            }
+          );
+        }catch{}
+      }
+    }
+  );
+
+  socket.on(
+    "invite:changed",
+    ()=>{
+      loadInvites();
+      loadRooms();
+    }
+  );
 }
+
 async function loadRooms(){
-  rooms=await api("/api/rooms");renderRooms();
+
+  rooms=await api(
+    "/api/rooms"
+  );
+
+  renderRooms();
 }
+
 function renderRooms(){
-  const q=$("search").value.trim().toLowerCase();
-  $("rooms").innerHTML=rooms.filter(r=>r.name.toLowerCase().includes(q)).map(r=>`
-    <div class="room ${activeRoom&&activeRoom.id===r.id?"active":""}" onclick="openRoom('${r.id}')">
-      <div class="avatar"><i class="fa-solid ${r.type==="group"?"fa-users":"fa-user"}"></i></div>
-      <div style="min-width:0"><div class="room-name">${escapeHTML(r.name)}</div><div class="room-meta">${r.type==="group"?"グループ":"フレンド"}</div></div>
-    </div>`).join("") || '<div style="padding:25px;text-align:center;color:#728096;font-size:12px">チャットがありません</div>';
+
+  const q=
+    $("search")
+      .value
+      .trim()
+      .toLowerCase();
+
+  $("rooms").innerHTML=
+    rooms
+      .filter(
+        r=>
+          r.name
+            .toLowerCase()
+            .includes(q)
+      )
+      .map(
+        r=>`
+          <div
+            class="room ${
+              activeRoom &&
+              activeRoom.id===r.id
+                ? "active"
+                : ""
+            }"
+            onclick="openRoom('${r.id}')"
+          >
+
+            <div class="avatar">
+              <i class="fa-solid ${
+                r.type==="group"
+                  ? "fa-users"
+                  : "fa-user"
+              }"></i>
+            </div>
+
+            <div style="min-width:0">
+
+              <div class="room-name">
+                ${escapeHTML(r.name)}
+              </div>
+
+              <div class="room-meta">
+                ${
+                  r.type==="group"
+                    ? "グループ"
+                    : "フレンド"
+                }
+              </div>
+
+            </div>
+
+          </div>
+        `
+      )
+      .join("")
+      ||
+      '<div style="padding:25px;text-align:center;color:#728096;font-size:12px">チャットがありません</div>';
 }
+
 $("search").oninput=renderRooms;
+
 async function openRoom(roomId){
-  activeRoom=rooms.find(r=>r.id===roomId);if(!activeRoom)return;
-  $("empty").classList.add("hidden");$("friendsView").classList.add("hidden");$("accountView").classList.add("hidden");$("chatView").classList.remove("hidden");
-  $("main").classList.add("open");$("chatTitle").textContent=activeRoom.name;renderRooms();
-  socket?.emit("room:join",roomId);
-  const msgs=await api("/api/rooms/"+roomId+"/messages");$("messages").innerHTML="";msgs.forEach(m=>appendMessage(m,false));scrollMessages();
-}
-function appendMessage(m,scroll){
-  const el=document.createElement("div");el.className="msg "+(m.sender_id===me.id?"me":"other");
-  el.innerHTML=escapeHTML(m.text).replace(/\n/g,"<br>")+`<small>${new Date(m.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</small>`;
-  $("messages").appendChild(el);if(scroll)scrollMessages();
-}
-function scrollMessages(){$("messages").scrollTop=$("messages").scrollHeight}
-$("composer").onsubmit=async e=>{
-  e.preventDefault();const text=$("message").value.trim();if(!text||!activeRoom)return;
-  $("message").value="";
-  try{await api("/api/rooms/"+activeRoom.id+"/messages",{method:"POST",body:JSON.stringify({text})})}catch(e){alert(e.message);$("message").value=text}
-};
-function closeMain(){$("main").classList.remove("open");}
-function tab(which){
-  document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));
-  $("nav"+(which==="chat"?"Chat":which==="friends"?"Friends":"Account")).classList.add("active");
-  $("empty").classList.add("hidden");$("chatView").classList.add("hidden");$("friendsView").classList.add("hidden");$("accountView").classList.add("hidden");
-  if(which==="chat"){if(activeRoom) $("chatView").classList.remove("hidden");else $("empty").classList.remove("hidden")}
-  if(which==="friends"){ $("friendsView").classList.remove("hidden");loadFriends()}
-  if(which==="account")$("accountView").classList.remove("hidden");
+
+  activeRoom=
+    rooms.find(
+      r=>r.id===roomId
+    );
+
+  if(!activeRoom)return;
+
+  $("empty").classList.add("hidden");
+  $("friendsView").classList.add("hidden");
+  $("accountView").classList.add("hidden");
+  $("chatView").classList.remove("hidden");
+
   $("main").classList.add("open");
+
+  $("chatTitle").textContent=
+    activeRoom.name;
+
+  renderChatActions();
+  renderRooms();
+
+  socket?.emit(
+    "room:join",
+    roomId
+  );
+
+  const msgs=
+    await api(
+      "/api/rooms/"+roomId+"/messages"
+    );
+
+  $("messages").innerHTML="";
+
+  msgs.forEach(
+    m=>appendMessage(m,false)
+  );
+
+  scrollMessages();
 }
-function closeModal(){$("modal").classList.add("hidden");$("modalBox").innerHTML="";if(scanner){scanner.stop().catch(()=>{});scanner.clear().catch(()=>{});scanner=null}}
-function modal(html){$("modalBox").innerHTML=html;$("modal").classList.remove("hidden")}
-$("modal").addEventListener("click",e=>{if(e.target.id==="modal")closeModal()});
-function openGroup(){modal(`<h3>グループを作成</h3><input id="groupName" maxlength="80" placeholder="グループ名"><div class="modal-actions"><button class="btn secondary" onclick="closeModal()">キャンセル</button><button class="btn" onclick="createGroup()">作成</button></div>`)}
-async function createGroup(){try{const name=$("groupName").value.trim();if(!name)return;const r=await api("/api/rooms",{method:"POST",body:JSON.stringify({name})});closeModal();await loadRooms();openRoom(r.id)}catch(e){alert(e.message)}}
-function openFriend(){modal(`<h3>フレンドを追加</h3><input id="friendUsername" placeholder="ユーザー名"><div class="modal-actions"><button class="btn" onclick="addFriend()">追加</button></div><hr style="border:0;border-top:1px solid #e3e7ef;margin:15px 0"><button class="btn secondary" onclick="openQR()">自分のQRコードを表示</button><button class="btn" style="margin-left:7px" onclick="scanQR()">QRを読み取る</button>`)}
-async function addFriend(){try{const username=$("friendUsername").value.trim();const d=await api("/api/friends/add",{method:"POST",body:JSON.stringify({username})});closeModal();await loadRooms();openRoom(d.room.id)}catch(e){alert(e.message)}}
+
+function renderChatActions(){
+
+  $("chatActions").innerHTML="";
+
+  if(
+    !activeRoom ||
+    activeRoom.type!=="group"
+  ){
+    return;
+  }
+
+  const button=document.createElement(
+    "button"
+  );
+
+  button.className="icon";
+  button.title="グループに招待";
+  button.innerHTML=
+    '<i class="fa-solid fa-user-plus"></i>';
+
+  button.onclick=()=>{
+    openGroupInvite(
+      activeRoom.id
+    );
+  };
+
+  $("chatActions").appendChild(
+    button
+  );
+}
+
+function appendMessage(m,scroll){
+
+  const el=
+    document.createElement("div");
+
+  el.className=
+    "msg "+
+    (
+      m.sender_id===me.id
+        ? "me"
+        : "other"
+    );
+
+  el.innerHTML=
+    escapeHTML(m.text)
+      .replace(/\n/g,"<br>")+
+    `<small>${
+      new Date(
+        m.created_at
+      ).toLocaleTimeString(
+        [],
+        {
+          hour:"2-digit",
+          minute:"2-digit"
+        }
+      )
+    }</small>`;
+
+  $("messages")
+    .appendChild(el);
+
+  if(scroll){
+    scrollMessages();
+  }
+}
+
+function scrollMessages(){
+  $("messages").scrollTop=
+    $("messages").scrollHeight;
+}
+
+$("composer").onsubmit=async e=>{
+
+  e.preventDefault();
+
+  const text=
+    $("message")
+      .value
+      .trim();
+
+  if(
+    !text ||
+    !activeRoom
+  ){
+    return;
+  }
+
+  $("message").value="";
+
+  try{
+
+    await api(
+      "/api/rooms/"+
+      activeRoom.id+
+      "/messages",
+      {
+        method:"POST",
+        body:JSON.stringify({
+          text
+        })
+      }
+    );
+
+  }catch(e){
+
+    alert(e.message);
+
+    $("message").value=
+      text;
+  }
+};
+
+function closeMain(){
+  $("main").classList.remove("open");
+}
+
+function tab(which){
+
+  document
+    .querySelectorAll(".nav button")
+    .forEach(
+      x=>x.classList.remove("active")
+    );
+
+  $("nav"+
+    (
+      which==="chat"
+        ? "Chat"
+        : which==="friends"
+          ? "Friends"
+          : "Account"
+    )
+  ).classList.add("active");
+
+  $("empty").classList.add("hidden");
+  $("chatView").classList.add("hidden");
+  $("friendsView").classList.add("hidden");
+  $("accountView").classList.add("hidden");
+
+  if(which==="chat"){
+
+    if(activeRoom){
+      $("chatView")
+        .classList
+        .remove("hidden");
+    }else{
+      $("empty")
+        .classList
+        .remove("hidden");
+    }
+
+  }
+
+  if(which==="friends"){
+
+    $("friendsView")
+      .classList
+      .remove("hidden");
+
+    loadFriends();
+    loadInvites();
+
+  }
+
+  if(which==="account"){
+
+    $("accountView")
+      .classList
+      .remove("hidden");
+
+  }
+
+  $("main")
+    .classList
+    .add("open");
+}
+
+function closeModal(){
+
+  $("modal")
+    .classList
+    .add("hidden");
+
+  $("modalBox")
+    .innerHTML="";
+
+  if(scanner){
+
+    scanner
+      .stop()
+      .catch(()=>{});
+
+    scanner
+      .clear()
+      .catch(()=>{});
+
+    scanner=null;
+  }
+
+  qrProcessing=false;
+}
+
+function modal(html){
+
+  $("modalBox")
+    .innerHTML=html;
+
+  $("modal")
+    .classList
+    .remove("hidden");
+}
+
+$("modal").addEventListener(
+  "click",
+  e=>{
+    if(e.target.id==="modal"){
+      closeModal();
+    }
+  }
+);
+
+function openGroup(){
+
+  modal(`
+    <h3>グループを作成</h3>
+
+    <input
+      id="groupName"
+      maxlength="80"
+      placeholder="グループ名"
+    >
+
+    <div class="modal-actions">
+
+      <button
+        class="btn secondary"
+        onclick="closeModal()"
+      >
+        キャンセル
+      </button>
+
+      <button
+        class="btn"
+        onclick="createGroup()"
+      >
+        作成
+      </button>
+
+    </div>
+  `);
+}
+
+async function createGroup(){
+
+  try{
+
+    const name=
+      $("groupName")
+        .value
+        .trim();
+
+    if(!name)return;
+
+    const r=
+      await api(
+        "/api/rooms",
+        {
+          method:"POST",
+          body:JSON.stringify({
+            name
+          })
+        }
+      );
+
+    closeModal();
+
+    await loadRooms();
+
+    openRoom(r.id);
+
+  }catch(e){
+
+    alert(e.message);
+  }
+}
+
+function openFriend(){
+
+  modal(`
+    <h3>フレンドを追加</h3>
+
+    <input
+      id="friendUsername"
+      placeholder="ユーザー名"
+    >
+
+    <div class="modal-actions">
+
+      <button
+        class="btn"
+        onclick="addFriend()"
+      >
+        追加
+      </button>
+
+    </div>
+
+    <hr
+      style="
+        border:0;
+        border-top:1px solid #e3e7ef;
+        margin:15px 0
+      "
+    >
+
+    <button
+      class="btn secondary"
+      onclick="openQR()"
+    >
+      自分のQRコードを表示
+    </button>
+
+    <button
+      class="btn"
+      style="margin-left:7px"
+      onclick="scanQR()"
+    >
+      QRを読み取る
+    </button>
+  `);
+}
+
+async function addFriend(){
+
+  try{
+
+    const username=
+      $("friendUsername")
+        .value
+        .trim();
+
+    const d=
+      await api(
+        "/api/friends/add",
+        {
+          method:"POST",
+          body:JSON.stringify({
+            username
+          })
+        }
+      );
+
+    closeModal();
+
+    await loadRooms();
+    await loadFriends();
+
+    openRoom(d.room.id);
+
+  }catch(e){
+
+    alert(e.message);
+  }
+}
+
 async function loadFriends(){
-  try{const fs=await api("/api/friends");$("friendsList").innerHTML=fs.length?fs.map(f=>`<div class="card"><b>${escapeHTML(f.friend.display_name)}</b><div class="muted">@${escapeHTML(f.friend.username)}</div><div class="actions"><button class="btn danger" onclick="removeFriend('${f.friend.id}')">削除</button></div></div>`).join(""):'<div class="muted">フレンドがいません</div>'}catch{}
+
+  try{
+
+    const fs=
+      await api("/api/friends");
+
+    $("friendsList").innerHTML=
+      fs.length
+        ? fs.map(
+            f=>`
+              <div class="card">
+
+                <b>
+                  ${escapeHTML(
+                    f.friend.display_name
+                  )}
+                </b>
+
+                <div class="muted">
+                  @${escapeHTML(
+                    f.friend.username
+                  )}
+                </div>
+
+                <div class="actions">
+
+                  <button
+                    class="btn danger"
+                    onclick="removeFriend('${f.friend.id}')"
+                  >
+                    削除
+                  </button>
+
+                </div>
+
+              </div>
+            `
+          ).join("")
+        :
+          '<div class="muted">フレンドがいません</div>';
+
+  }catch{}
 }
-async function removeFriend(id){if(!confirm("このフレンドを削除しますか？"))return;try{await api("/api/friends/"+id,{method:"DELETE"});await loadFriends()}catch(e){alert(e.message)}}
+
+async function removeFriend(id){
+
+  if(
+    !confirm(
+      "このフレンドを削除しますか？"
+    )
+  ){
+    return;
+  }
+
+  try{
+
+    await api(
+      "/api/friends/"+id,
+      {
+        method:"DELETE"
+      }
+    );
+
+    await loadFriends();
+    await loadRooms();
+
+  }catch(e){
+
+    alert(e.message);
+  }
+}
+
 async function openQR(){
-  try{const d=await api("/api/friends/qr");modal(`<h3>マイQRコード</h3><div id="qrcode" class="qr"></div><p class="muted" style="text-align:center">QRコードは10分で期限切れになります。</p><div class="modal-actions"><button class="btn secondary" onclick="closeModal()">閉じる</button></div>`);new QRCode($("qrcode"),{text:d.token,width:220,height:220})}catch(e){alert(e.message)}
+
+  try{
+
+    const d=
+      await api(
+        "/api/friends/qr"
+      );
+
+    modal(`
+      <h3>マイQRコード</h3>
+
+      <div
+        id="qrcode"
+        class="qr"
+      ></div>
+
+      <p
+        class="muted"
+        style="text-align:center"
+      >
+        QRコードは10分で期限切れになります。
+      </p>
+
+      <div class="modal-actions">
+
+        <button
+          class="btn secondary"
+          onclick="closeModal()"
+        >
+          閉じる
+        </button>
+
+      </div>
+    `);
+
+    new QRCode(
+      $("qrcode"),
+      {
+        text:d.token,
+        width:220,
+        height:220
+      }
+    );
+
+  }catch(e){
+
+    alert(e.message);
+  }
 }
+
 async function scanQR(){
-  modal(`<h3>QRコードを読み取る</h3><div id="reader"></div><p class="muted">カメラへのアクセスを許可してください。</p><div class="modal-actions"><button class="btn secondary" onclick="closeModal()">キャンセル</button></div>`);
-  scanner=new Html5Qrcode("reader");
-  try{await scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:230,height:230}},async text=>{
-    try{await api("/api/friends/qr",{method:"POST",body:JSON.stringify({token:text})});closeModal();await loadFriends();await loadRooms();alert("フレンドを追加しました。")}catch(e){alert(e.message)}
-  },()=>{})}catch(e){alert("カメラを起動できません: "+e);closeModal()}
+
+  qrProcessing=false;
+
+  modal(`
+    <h3>QRコードを読み取る</h3>
+
+    <div id="reader"></div>
+
+    <p class="muted">
+      カメラへのアクセスを許可してください。
+    </p>
+
+    <div class="modal-actions">
+
+      <button
+        class="btn secondary"
+        onclick="closeModal()"
+      >
+        キャンセル
+      </button>
+
+    </div>
+  `);
+
+  scanner=
+    new Html5Qrcode(
+      "reader"
+    );
+
+  try{
+
+    await scanner.start(
+      {
+        facingMode:"environment"
+      },
+      {
+        fps:10,
+        qrbox:{
+          width:230,
+          height:230
+        }
+      },
+      async text=>{
+
+        if(qrProcessing){
+          return;
+        }
+
+        qrProcessing=true;
+
+        try{
+
+          await scanner.stop();
+
+        }catch{}
+
+        try{
+
+          const d=
+            await api(
+              "/api/friends/qr",
+              {
+                method:"POST",
+                body:JSON.stringify({
+                  token:text
+                })
+              }
+            );
+
+          closeModal();
+
+          await loadFriends();
+          await loadRooms();
+
+          alert(
+            d.alreadyFriend
+              ? "すでにフレンドです。"
+              : "フレンドを追加しました。"
+          );
+
+        }catch(e){
+
+          qrProcessing=false;
+
+          alert(e.message);
+        }
+
+      },
+      ()=>{}
+    );
+
+  }catch(e){
+
+    alert(
+      "カメラを起動できません: "+
+      e
+    );
+
+    closeModal();
+  }
 }
-async function saveProfile(){try{const d=await api("/api/me",{method:"PUT",body:JSON.stringify({displayName:$("displayName").value.trim()})});me=d.user;$("meName").textContent=me.display_name;alert("更新しました")}catch(e){alert(e.message)}}
-async function logout(){try{await api("/api/auth/logout",{method:"POST"})}finally{location.reload()}}
+
+async function saveProfile(){
+
+  try{
+
+    const d=
+      await api(
+        "/api/me",
+        {
+          method:"PUT",
+          body:JSON.stringify({
+            displayName:
+              $("displayName")
+                .value
+                .trim()
+          })
+        }
+      );
+
+    me=d.user;
+
+    $("meName").textContent=
+      me.display_name;
+
+    alert("更新しました");
+
+  }catch(e){
+
+    alert(e.message);
+  }
+}
+
+async function logout(){
+
+  try{
+
+    await api(
+      "/api/auth/logout",
+      {
+        method:"POST"
+      }
+    );
+
+  }finally{
+
+    location.reload();
+  }
+}
+
+/* =========================
+   グループ招待
+========================= */
+
+async function openGroupInvite(roomId){
+
+  try{
+
+    const room=
+      await api(
+        "/api/rooms/"+roomId
+      );
+
+    modal(`
+      <h3>
+        「${escapeHTML(room.name)}」に招待
+      </h3>
+
+      <input
+        id="inviteUsername"
+        maxlength="24"
+        placeholder="招待するユーザー名"
+      >
+
+      <div class="muted">
+        ユーザー名を入力すると招待状を送信できます。
+      </div>
+
+      <div class="modal-actions">
+
+        <button
+          class="btn secondary"
+          onclick="closeModal()"
+        >
+          キャンセル
+        </button>
+
+        <button
+          class="btn"
+          onclick="sendGroupInvite('${roomId}')"
+        >
+          招待状を送る
+        </button>
+
+      </div>
+    `);
+
+  }catch(e){
+
+    alert(e.message);
+  }
+}
+
+async function sendGroupInvite(roomId){
+
+  try{
+
+    const username=
+      $("inviteUsername")
+        .value
+        .trim();
+
+    if(!username){
+      return;
+    }
+
+    await api(
+      "/api/rooms/"+roomId+"/invites",
+      {
+        method:"POST",
+        body:JSON.stringify({
+          username
+        })
+      }
+    );
+
+    closeModal();
+
+    alert(
+      "招待状を送信しました。"
+    );
+
+  }catch(e){
+
+    alert(e.message);
+  }
+}
+
+async function loadInvites(){
+
+  try{
+
+    const invites=
+      await api(
+        "/api/invites"
+      );
+
+    const badge=
+      $("inviteBadge");
+
+    if(invites.length){
+
+      badge.textContent=
+        invites.length;
+
+      badge.classList.remove(
+        "hidden"
+      );
+
+    }else{
+
+      badge.classList.add(
+        "hidden"
+      );
+    }
+
+    if(
+      !$("invitesArea")
+    ){
+      return;
+    }
+
+    if(!invites.length){
+
+      $("invitesArea").innerHTML="";
+      return;
+    }
+
+    $("invitesArea").innerHTML=`
+      <h3 style="margin-bottom:10px">
+        グループへの招待
+      </h3>
+
+      ${invites.map(
+        invite=>`
+          <div class="invite-card">
+
+            <div class="invite-title">
+              ${escapeHTML(
+                invite.room.name
+              )}
+            </div>
+
+            <div class="invite-info">
+              ${escapeHTML(
+                invite.inviter.display_name
+              )}
+              さんからの招待
+            </div>
+
+            <div class="actions">
+
+              <button
+                class="btn success"
+                onclick="acceptInvite('${invite.id}')"
+              >
+                参加する
+              </button>
+
+              <button
+                class="btn danger"
+                onclick="rejectInvite('${invite.id}')"
+              >
+                拒否
+              </button>
+
+            </div>
+
+          </div>
+        `
+      ).join("")}
+    `;
+
+  }catch{
+
+    if($("invitesArea")){
+      $("invitesArea").innerHTML="";
+    }
+  }
+}
+
+async function acceptInvite(id){
+
+  try{
+
+    const d=
+      await api(
+        "/api/invites/"+id+"/accept",
+        {
+          method:"POST"
+        }
+      );
+
+    await loadInvites();
+    await loadRooms();
+
+    alert(
+      "グループに参加しました。"
+    );
+
+    if(d.room){
+
+      openRoom(
+        d.room.id
+      );
+    }
+
+  }catch(e){
+
+    alert(e.message);
+  }
+}
+
+async function rejectInvite(id){
+
+  try{
+
+    await api(
+      "/api/invites/"+id+"/reject",
+      {
+        method:"POST"
+      }
+    );
+
+    await loadInvites();
+
+  }catch(e){
+
+    alert(e.message);
+  }
+}
+
 boot();
 </script>
+
 </body>
 </html>
