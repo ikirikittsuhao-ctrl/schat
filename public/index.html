@@ -54,7 +54,7 @@ button{cursor:pointer}
 .msg{max-width:min(70%,620px);padding:10px 13px;border-radius:15px;background:#fff;border:1px solid var(--border);line-height:1.5;font-size:14px}
 .msg.me{align-self:flex-end;background:var(--primary);color:#fff;border-color:var(--primary);border-bottom-right-radius:5px}
 .msg.other{align-self:flex-start;border-bottom-left-radius:5px}
-.msg small{display:block;font-size:10px;opacity:.65;margin-top:3px}
+.msg{position:relative;touch-action:pan-y;user-select:none}.msg.replying{outline:2px solid rgba(37,99,235,.28)}.reply-preview{display:flex;align-items:center;gap:8px;background:var(--surface2);border-left:3px solid var(--primary);padding:7px 9px;margin:-2px -2px 7px;border-radius:7px;font-size:11px;color:var(--muted)}.msg.me .reply-preview{background:rgba(255,255,255,.14);border-left-color:#fff;color:rgba(255,255,255,.82)}.reply-preview-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}.reply-preview button{border:0;background:transparent;color:inherit;font-size:14px}.reply-bar{display:none;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid var(--border);background:#f8fafc;font-size:12px;color:var(--muted)}.reply-bar.show{display:flex}.reply-bar-text{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reply-bar button{border:0;background:transparent;color:var(--muted);font-size:16px}.read-state{font-size:10px;opacity:.7;margin-left:5px}.msg small{display:block;font-size:10px;opacity:.65;margin-top:3px}
 .composer{padding:13px 16px;border-top:1px solid var(--border);background:#fff;display:flex;gap:8px}
 .composer input{flex:1;min-width:0;border:1px solid var(--border);border-radius:22px;padding:11px 15px;outline:0;background:#f7f9fc}
 .send{width:45px;border:0;border-radius:50%;background:var(--primary);color:#fff}
@@ -151,6 +151,7 @@ button{cursor:pointer}
 <section id="chatView" class="hidden" style="height:100%;display:flex;flex-direction:column">
 <div class="chat-head"><button class="icon back mobile-back" onclick="closeMain()"><i class="fa-solid fa-arrow-left"></i></button><div id="chatTitle" class="chat-title">チャット</div><div id="chatActions" class="chat-actions"></div></div>
 <div id="messages" class="messages"></div>
+<div id="replyBar" class="reply-bar"><i class="fa-solid fa-reply"></i><span class="reply-bar-text" id="replyBarText"></span><button type="button" onclick="clearReply()" title="返信を解除"><i class="fa-solid fa-xmark"></i></button></div>
 <form id="composer" class="composer"><input id="message" maxlength="2000" placeholder="メッセージを入力"><button class="send"><i class="fa-solid fa-paper-plane"></i></button></form>
 </section>
 <section id="friendsView" class="panel hidden">
@@ -175,8 +176,8 @@ button{cursor:pointer}
 let me=null,rooms=[],activeRoom=null,socket=null,scanner=null,registerMode=false,qrProcessing=false;
 let unreadCounts={};
 let onlineUsers=new Set();
+let replyTarget=null;
 const $=id=>document.getElementById(id);
-
 function showAlert(msg,type="error"){
 const container=$("toastContainer"),toast=document.createElement("div");
 toast.className=`toast ${type}`;
@@ -184,19 +185,15 @@ toast.innerHTML=`<i class="fa-solid ${type==="error"?"fa-circle-exclamation":"fa
 container.appendChild(toast);
 setTimeout(()=>{toast.style.opacity="0";toast.style.transition="opacity .3s";setTimeout(()=>toast.remove(),300)},4000);
 }
-
 function showLoading(show){$("loading").classList.toggle("hidden",!show)}
-
 async function api(url,opts={}){
 const r=await fetch(url,{credentials:"include",headers:{"Content-Type":"application/json",...(opts.headers||{})},...opts});
 const d=await r.json().catch(()=>({}));
 if(!r.ok)throw new Error(d.error||"通信エラー");
 return d;
 }
-
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function showAuthError(e){$("authError").textContent=e.message||String(e)}
-
 function setAuthMode(reg){
 registerMode=reg;
 $("authName").classList.toggle("hidden",!reg);
@@ -205,9 +202,7 @@ $("authDesc").textContent=reg?"新しいschatアカウントを作成":"ユー�
 $("authSwitchText").textContent=reg?"既にアカウントがありますか？":"アカウントを作成する";
 $("authSwitch").textContent=reg?"ログイン":"新規登録";
 }
-
 $("authSwitch").onclick=()=>setAuthMode(!registerMode);
-
 $("authBtn").onclick=async()=>{
 try{
 $("authError").textContent="";
@@ -218,9 +213,7 @@ me=d.user;
 await startApp();
 }catch(e){showAuthError(e)}
 };
-
 $("authPass").addEventListener("keydown",e=>{if(e.key==="Enter")$("authBtn").click()});
-
 async function boot(){
 try{
 const d=await api("/api/auth/me");
@@ -228,7 +221,6 @@ me=d.user;
 await startApp();
 }catch{setAuthMode(false)}
 }
-
 async function startApp(){
 $("auth").classList.add("hidden");
 $("meName").textContent=me.display_name;
@@ -240,25 +232,20 @@ await loadFriends();
 await loadFriendRequests();
 await loadInvites();
 }
-
 function connectSocket(){
 if(socket){
 try{socket.disconnect()}catch{}
 }
-
 socket=io({withCredentials:true});
-
 socket.on("connect",()=>{
 if(activeRoom)socket.emit("room:join",activeRoom.id);
 });
-
 socket.on("presence:state",ids=>{
 onlineUsers=new Set(ids||[]);
 renderRooms();
 renderFriendsPresence();
 renderChatTitle();
 });
-
 socket.on("presence:update",data=>{
 if(!data||!data.userId)return;
 if(data.online)onlineUsers.add(data.userId);
@@ -267,12 +254,9 @@ renderRooms();
 renderFriendsPresence();
 renderChatTitle();
 });
-
 socket.on("message:new",m=>{
 if(!m||!m.room_id)return;
-
 const visible=activeRoom&&m.room_id===activeRoom.id&&isChatVisible();
-
 if(visible){
 appendMessage(m,true);
 markRoomRead(m.room_id);
@@ -282,19 +266,19 @@ updateUnreadDisplay();
 renderRooms();
 }
 });
-
 socket.on("rooms:changed",()=>loadRooms());
-
 socket.on("room:changed",()=>loadRooms());
-
 socket.on("room:read",data=>{
 if(data&&data.roomId){
 unreadCounts[data.roomId]=0;
 updateUnreadDisplay();
 renderRooms();
+if(data.roomId===activeRoom?.id)refreshMessageReadStates();
 }
 });
-
+socket.on("message:read",data=>{
+if(data?.roomId===activeRoom?.id)refreshMessageReadStates();
+});
 socket.on("invite:new",async invite=>{
 await loadInvites();
 if(invite?.room&&activeRoom&&invite.room.id===activeRoom.id)renderChatActions();
@@ -302,24 +286,20 @@ if("Notification" in window&&Notification.permission==="granted"){
 try{new Notification("schat - グループ招待",{body:`${invite.inviter?.display_name||"ユーザー"}から「${invite.room?.name||"グループ"}」への招待が届きました。`})}catch{}
 }
 });
-
 socket.on("invite:changed",()=>{
 loadInvites();
 loadRooms();
 });
-
 socket.on("friend:request",async()=>{
 await loadFriendRequests();
 showAlert("新しいフレンド申請が届きました","success");
 });
-
 socket.on("friend:new",async()=>{
 await loadFriends();
 await loadRooms();
 showAlert("フレンドが追加されました","success");
 });
 }
-
 async function loadRooms(){
 try{
 rooms=await api("/api/rooms");
@@ -329,7 +309,6 @@ updateUnreadDisplay();
 renderRooms();
 }catch(e){showAlert(e.message)}
 }
-
 function updateUnreadDisplay(){
 let total=0;
 Object.values(unreadCounts).forEach(c=>total+=Number(c)||0);
@@ -339,14 +318,11 @@ badge.textContent=total>99?"99+":total;
 badge.classList.remove("hidden");
 }else badge.classList.add("hidden");
 }
-
 function renderRooms(){
 const q=$("search").value.trim().toLowerCase();
-
 $("rooms").innerHTML=rooms.filter(r=>(r.name||"").toLowerCase().includes(q)).map(r=>{
 const unread=Number(unreadCounts[r.id]||0);
 const online=r.peer_id?onlineUsers.has(r.peer_id):false;
-
 return `<div class="room ${activeRoom&&activeRoom.id===r.id?"active":""}" onclick="openRoom('${r.id}')">
 <div class="avatar">
 <i class="fa-solid ${r.type==="group"?"fa-users":"fa-user"}"></i>
@@ -365,9 +341,7 @@ ${r.type==="friend"&&!online?"</span>":""}
 </div>`;
 }).join("")||'<div style="padding:25px;text-align:center;color:#728096;font-size:12px">チャットがありません</div>';
 }
-
 $("search").oninput=renderRooms;
-
 function isChatVisible(){
 if(!activeRoom)return false;
 if(document.visibilityState!=="visible")return false;
@@ -375,7 +349,6 @@ if($("chatView").classList.contains("hidden"))return false;
 if(window.innerWidth<=800&&!$("main").classList.contains("open"))return false;
 return true;
 }
-
 async function markRoomRead(roomId){
 if(!roomId)return;
 try{
@@ -385,53 +358,44 @@ updateUnreadDisplay();
 renderRooms();
 }catch{}
 }
-
 async function openRoom(roomId){
 activeRoom=rooms.find(r=>r.id===roomId);
 if(!activeRoom)return;
-
 unreadCounts[roomId]=0;
 updateUnreadDisplay();
-
 $("empty").classList.add("hidden");
 $("friendsView").classList.add("hidden");
 $("accountView").classList.add("hidden");
 $("chatView").classList.remove("hidden");
 $("main").classList.add("open");
 $("chatTitle").textContent=activeRoom.name;
-
 renderChatActions();
 renderRooms();
 renderChatTitle();
-
 showLoading(true);
-
 try{
 socket?.emit("room:join",roomId);
 const msgs=await api("/api/rooms/"+roomId+"/messages");
 $("messages").innerHTML="";
-msgs.forEach(m=>appendMessage(m,false));
+const messageMap=new Map(msgs.map(m=>[String(m.id),m]));
+msgs.forEach(m=>{if(m.reply_to_id){m.reply_to_text=messageMap.get(String(m.reply_to_id))?.text||"返信先のメッセージ";}appendMessage(m,false);});
 scrollMessages();
 await markRoomRead(roomId);
 }catch(e){
 showAlert("メッセージの読み込みに失敗しました: "+e.message);
 }finally{showLoading(false)}
 }
-
 function renderChatTitle(){
 if(!activeRoom)return;
-
 if(activeRoom.type==="friend"&&activeRoom.peer_id){
 $("chatTitle").innerHTML=`${escapeHTML(activeRoom.name)} <span style="font-size:11px;font-weight:500;margin-left:6px" class="${onlineUsers.has(activeRoom.peer_id)?"online-text":"offline-text"}">${onlineUsers.has(activeRoom.peer_id)?"オンライン":"オフライン"}</span>`;
 }else{
 $("chatTitle").textContent=activeRoom.name;
 }
 }
-
 function renderChatActions(){
 $("chatActions").innerHTML="";
 if(!activeRoom||activeRoom.type!=="group")return;
-
 const button=document.createElement("button");
 button.className="icon";
 button.title="グループに招待";
@@ -439,46 +403,80 @@ button.innerHTML='<i class="fa-solid fa-user-plus"></i>';
 button.onclick=()=>openGroupInvite(activeRoom.id);
 $("chatActions").appendChild(button);
 }
-
 function appendMessage(m,scroll){
 if($("messages").querySelector(`[data-message-id="${CSS.escape(String(m.id))}"]`))return;
-
 const el=document.createElement("div");
 el.dataset.messageId=m.id;
+el.dataset.replyToId=m.reply_to_id||"";
 el.className="msg "+(m.sender_id===me.id?"me":"other");
-el.innerHTML=escapeHTML(m.text).replace(/\n/g,"<br>")+`<small>${new Date(m.created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</small>`;
+const replyHtml=m.reply_to_id&&m.reply_to_text?`<div class="reply-preview"><i class="fa-solid fa-reply"></i><span class="reply-preview-text">${escapeHTML(m.reply_to_text)}</span></div>`:"";
+const readHtml=m.sender_id===me.id?`<span class="read-state">${m.read_by_all?"既読":"未読"}</span>`:"";
+el.innerHTML=replyHtml+escapeHTML(m.text).replace(/\n/g,"<br>")+`<small>${new Date(m.created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}${readHtml}</small>`;
+addSwipeReply(el,m);
 $("messages").appendChild(el);
 if(scroll)scrollMessages();
 }
-
+function addSwipeReply(el,m){
+let startX=0,startY=0,moved=false;
+el.addEventListener("touchstart",e=>{const t=e.changedTouches[0];startX=t.clientX;startY=t.clientY;moved=false},{passive:true});
+el.addEventListener("touchmove",e=>{const t=e.changedTouches[0];if(Math.abs(t.clientX-startX)>12||Math.abs(t.clientY-startY)>12)moved=true},{passive:true});
+el.addEventListener("touchend",e=>{const t=e.changedTouches[0];const dx=t.clientX-startX;const dy=t.clientY-startY;if(moved&&dx<-60&&Math.abs(dx)>Math.abs(dy)*1.2)setReplyTarget(m)},{passive:true});
+let pointerDown=false;
+el.addEventListener("pointerdown",e=>{if(e.pointerType!=="touch")return;pointerDown=true;startX=e.clientX;startY=e.clientY});
+el.addEventListener("pointerup",e=>{if(!pointerDown||e.pointerType!=="touch")return;pointerDown=false;const dx=e.clientX-startX;const dy=e.clientY-startY;if(dx<-60&&Math.abs(dx)>Math.abs(dy)*1.2)setReplyTarget(m)});
+}
+function setReplyTarget(m){
+replyTarget=m;
+document.querySelectorAll(".msg.replying").forEach(el=>el.classList.remove("replying"));
+const el=$("messages").querySelector(`[data-message-id="${CSS.escape(String(m.id))}"]`);
+if(el)el.classList.add("replying");
+$("replyBarText").textContent=`${m.sender_id===me.id?"自分":"相手"}: ${m.text}`;
+$("replyBar").classList.add("show");
+$("message").focus();
+}
+function clearReply(){
+replyTarget=null;
+document.querySelectorAll(".msg.replying").forEach(el=>el.classList.remove("replying"));
+$("replyBar").classList.remove("show");
+$("replyBarText").textContent="";
+}
+function refreshMessageReadStates(){
+api("/api/rooms/"+activeRoom.id+"/messages").then(msgs=>{
+msgs.forEach(m=>{
+const el=$("messages").querySelector(`[data-message-id="${CSS.escape(String(m.id))}"]`);
+if(!el||m.sender_id!==me.id)return;
+const small=el.querySelector("small");
+if(!small)return;
+const state=small.querySelector(".read-state");
+if(state)state.textContent=m.read_by_all?"既読":"未読";
+});
+}).catch(()=>{});
+}
 function scrollMessages(){$("messages").scrollTop=$("messages").scrollHeight}
-
 $("composer").onsubmit=async e=>{
 e.preventDefault();
 const text=$("message").value.trim();
 if(!text||!activeRoom)return;
-
+const replyTargetBeforeSend=replyTarget;
+const replyToId=replyTargetBeforeSend?.id||null;
 $("message").value="";
-
+clearReply();
 try{
-await api("/api/rooms/"+activeRoom.id+"/messages",{method:"POST",body:JSON.stringify({text})});
+await api("/api/rooms/"+activeRoom.id+"/messages",{method:"POST",body:JSON.stringify({text,replyToId})});
 }catch(e){
 showAlert(e.message);
 $("message").value=text;
+if(replyToId&&replyTargetBeforeSend)setReplyTarget(replyTargetBeforeSend)
 }
 };
-
 function closeMain(){$("main").classList.remove("open")}
-
 function tab(which){
 document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));
 $("nav"+(which==="chat"?"Chat":which==="friends"?"Friends":"Account")).classList.add("active");
-
 $("empty").classList.add("hidden");
 $("chatView").classList.add("hidden");
 $("friendsView").classList.add("hidden");
 $("accountView").classList.add("hidden");
-
 if(which==="chat"){
 if(activeRoom){
 $("chatView").classList.remove("hidden");
@@ -491,10 +489,8 @@ loadFriends();
 loadFriendRequests();
 loadInvites();
 }else if(which==="account")$("accountView").classList.remove("hidden");
-
 $("main").classList.add("open");
 }
-
 function closeModal(){
 $("modal").classList.add("hidden");
 $("modalBox").innerHTML="";
@@ -505,18 +501,14 @@ scanner=null;
 }
 qrProcessing=false;
 }
-
 function modal(html){
 $("modalBox").innerHTML=html;
 $("modal").classList.remove("hidden");
 }
-
 $("modal").addEventListener("click",e=>{if(e.target.id==="modal")closeModal()});
-
 function openGroup(){
 modal(`<h3>グループを作成</h3><input id="groupName" maxlength="80" placeholder="グループ名"><div class="modal-actions"><button class="btn secondary" onclick="closeModal()">キャンセル</button><button class="btn" onclick="createGroup()">作成</button></div>`);
 }
-
 async function createGroup(){
 try{
 const name=$("groupName").value.trim();
@@ -527,11 +519,9 @@ await loadRooms();
 openRoom(r.id);
 }catch(e){showAlert(e.message)}
 }
-
 function openFriend(){
 modal(`<h3>フレンドを追加</h3><input id="friendUsername" placeholder="ユーザー名"><div class="modal-actions"><button class="btn" onclick="addFriend()">申請を送る</button></div><hr style="border:0;border-top:1px solid #e3e7ef;margin:15px 0"><button class="btn secondary" onclick="openQR()">自分のQRコードを表示</button><button class="btn" style="margin-left:7px" onclick="scanQR()">QRを読み取る</button>`);
 }
-
 async function addFriend(){
 try{
 const username=$("friendUsername").value.trim();
@@ -540,14 +530,11 @@ closeModal();
 showAlert(d.message||"フレンド申請を送信しました。","success");
 }catch(e){showAlert(e.message)}
 }
-
 async function loadFriends(){
 try{
 const fs=await api("/api/friends");
-
 $("friendsList").innerHTML=fs.length?fs.map(f=>{
 const online=onlineUsers.has(f.friend.id);
-
 return `<div class="card">
 <div style="display:flex;align-items:center;gap:12px">
 <div class="avatar"><i class="fa-solid fa-user"></i><span class="presence-dot ${online?"online":""}"></span></div>
@@ -558,27 +545,22 @@ return `<div class="card">
 }).join(""):'<div class="muted">フレンドがいません</div>';
 }catch{}
 }
-
 function renderFriendsPresence(){
 if($("friendsView")&&!$("friendsView").classList.contains("hidden"))loadFriends();
 }
-
 async function loadFriendRequests(){
 try{
 const reqs=await api("/api/friends/requests");
 const container=$("friendRequestsArea");
-
 if(!reqs.length){
 container.innerHTML="";
 updateBadge();
 return;
 }
-
 container.innerHTML=`<h3 style="margin-bottom:10px">フレンド申請</h3>${reqs.map(r=>`<div class="invite-card"><div class="invite-title">${escapeHTML(r.user.display_name)}</div><div class="invite-info">@${escapeHTML(r.user.username)} さんからのフレンド申請</div><div class="actions"><button class="btn success" onclick="acceptFriendRequest('${r.user.id}')">許可</button><button class="btn danger" onclick="rejectFriendRequest('${r.user.id}')">拒否</button></div></div>`).join("")}`;
 updateBadge();
 }catch{}
 }
-
 async function acceptFriendRequest(id){
 try{
 const d=await api("/api/friends/accept",{method:"POST",body:JSON.stringify({requesterId:id})});
@@ -589,7 +571,6 @@ await loadRooms();
 if(d.room)openRoom(d.room.id);
 }catch(e){showAlert(e.message)}
 }
-
 async function rejectFriendRequest(id){
 try{
 await api("/api/friends/reject",{method:"POST",body:JSON.stringify({requesterId:id})});
@@ -597,7 +578,6 @@ showAlert("フレンド申請を拒否しました");
 await loadFriendRequests();
 }catch(e){showAlert(e.message)}
 }
-
 async function removeFriend(id){
 if(!confirm("このフレンドを削除しますか？"))return;
 try{
@@ -607,7 +587,6 @@ await loadRooms();
 showAlert("フレンドを削除しました");
 }catch(e){showAlert(e.message)}
 }
-
 async function openQR(){
 try{
 const d=await api("/api/friends/qr");
@@ -615,21 +594,15 @@ modal(`<h3>マイQRコード</h3><div id="qrcode" class="qr"></div><p class="mut
 new QRCode($("qrcode"),{text:d.token,width:220,height:220});
 }catch(e){showAlert(e.message)}
 }
-
 async function scanQR(){
 qrProcessing=false;
-
 modal(`<h3>QRコードを読み取る</h3><div id="reader"></div><p class="muted">カメラへのアクセスを許可してください。</p><div class="modal-actions"><button class="btn secondary" onclick="closeModal()">キャンセル</button></div>`);
-
 scanner=new Html5Qrcode("reader");
-
 try{
 await scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:230,height:230}},async text=>{
 if(qrProcessing)return;
 qrProcessing=true;
-
 try{await scanner.stop()}catch{}
-
 try{
 const d=await api("/api/friends/qr",{method:"POST",body:JSON.stringify({token:text})});
 closeModal();
@@ -647,7 +620,6 @@ showAlert("カメラを起動できません: "+e);
 closeModal();
 }
 }
-
 async function saveProfile(){
 try{
 const d=await api("/api/me",{method:"PUT",body:JSON.stringify({displayName:$("displayName").value.trim()})});
@@ -656,18 +628,15 @@ $("meName").textContent=me.display_name;
 showAlert("プロフィールを更新しました","success");
 }catch(e){showAlert(e.message)}
 }
-
 async function logout(){
 try{await api("/api/auth/logout",{method:"POST"})}finally{location.reload()}
 }
-
 async function openGroupInvite(roomId){
 try{
 const room=await api("/api/rooms/"+roomId);
 modal(`<h3>「${escapeHTML(room.name)}」に招待</h3><input id="inviteUsername" maxlength="24" placeholder="招待するユーザー名"><div class="muted">ユーザー名を入力すると招待状を送信できます。</div><div class="modal-actions"><button class="btn secondary" onclick="closeModal()">キャンセル</button><button class="btn" onclick="sendGroupInvite('${roomId}')">招待状を送る</button></div>`);
 }catch(e){showAlert(e.message)}
 }
-
 async function sendGroupInvite(roomId){
 try{
 const username=$("inviteUsername").value.trim();
@@ -677,39 +646,33 @@ closeModal();
 showAlert("招待状を送信しました。","success");
 }catch(e){showAlert(e.message)}
 }
-
 async function loadInvites(){
 try{
 const invites=await api("/api/invites");
 if(!$("invitesArea"))return;
-
 if(!invites.length){
 $("invitesArea").innerHTML="";
 updateBadge();
 return;
 }
-
 $("invitesArea").innerHTML=`<h3 style="margin-bottom:10px">グループへの招待</h3>${invites.map(invite=>`<div class="invite-card"><div class="invite-title">${escapeHTML(invite.room.name)}</div><div class="invite-info">${escapeHTML(invite.inviter.display_name)}さんからの招待</div><div class="actions"><button class="btn success" onclick="acceptInvite('${invite.id}')">参加する</button><button class="btn danger" onclick="rejectInvite('${invite.id}')">拒否</button></div></div>`).join("")}`;
 updateBadge();
 }catch{
 if($("invitesArea"))$("invitesArea").innerHTML="";
 }
 }
-
 async function updateBadge(){
 try{
 const reqs=await api("/api/friends/requests").catch(()=>[]);
 const invites=await api("/api/invites").catch(()=>[]);
 const total=reqs.length+invites.length;
 const badge=$("inviteBadge");
-
 if(total>0){
 badge.textContent=total>99?"99+":total;
 badge.classList.remove("hidden");
 }else badge.classList.add("hidden");
 }catch{}
 }
-
 async function acceptInvite(id){
 try{
 const d=await api("/api/invites/"+id+"/accept",{method:"POST"});
@@ -719,7 +682,6 @@ showAlert("グループに参加しました。","success");
 if(d.room)openRoom(d.room.id);
 }catch(e){showAlert(e.message)}
 }
-
 async function rejectInvite(id){
 try{
 await api("/api/invites/"+id+"/reject",{method:"POST"});
@@ -727,15 +689,12 @@ await loadInvites();
 showAlert("招待を拒否しました。");
 }catch(e){showAlert(e.message)}
 }
-
 document.addEventListener("visibilitychange",()=>{
 if(document.visibilityState==="visible"&&activeRoom&&isChatVisible())markRoomRead(activeRoom.id);
 });
-
 window.addEventListener("focus",()=>{
 if(activeRoom&&isChatVisible())markRoomRead(activeRoom.id);
 });
-
 boot();
 </script>
 </body>
