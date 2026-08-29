@@ -51,41 +51,40 @@ const io = new Server(server, {
 app.set("trust proxy", 1);
 app.disable("x-powered-by");
 
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: [
-          "'self'",
-          "'unsafe-inline'",
-          "https://cdnjs.cloudflare.com",
-          "https://fonts.googleapis.com"
-        ],
-        fontSrc: [
-          "'self'",
-          "https://cdnjs.cloudflare.com",
-          "https://fonts.gstatic.com",
-          "data:"
-        ],
-        scriptSrc: [
-          "'self'",
-          "https://cdnjs.cloudflare.com",
-          "https://unpkg.com"
-        ],
-        imgSrc: ["'self'", "data:", "blob:", "https:"],
-        connectSrc: ["'self'", "ws:", "wss:"],
-        camera: ["'self'"],
-        objectSrc: ["'none'"],
-        baseUri: ["'self'"],
-        frameAncestors: ["'none'"]
-      }
-    },
-    referrerPolicy: {
-      policy: "strict-origin-when-cross-origin"
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        "https://cdnjs.cloudflare.com",
+        "https://fonts.googleapis.com"
+      ],
+      fontSrc: [
+        "'self'",
+        "https://cdnjs.cloudflare.com",
+        "https://fonts.gstatic.com",
+        "data:"
+      ],
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        "https://cdnjs.cloudflare.com",
+        "https://unpkg.com"
+      ],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      connectSrc: ["'self'", "ws:", "wss:"],
+      camera: ["'self'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"]
     }
-  })
-);
+  },
+  referrerPolicy: {
+    policy: "strict-origin-when-cross-origin"
+  }
+}));
 
 app.use(
   cors({
@@ -1388,7 +1387,9 @@ io.on("connection", socket => {
   );
 });
 
-app.use((req, res) => { res.sendFile(path.join(__dirname, "public", "index.html")); });
+app.get("/{*splat}", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
 server.listen(
   PORT,
