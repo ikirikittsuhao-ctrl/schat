@@ -483,6 +483,12 @@ app.post("/api/rooms/:roomId/read",requireAuth,async(req,res)=>{
     await markRoomRead(req.user.id,roomId);
 
     io.to(`user:${req.user.id}`).emit("room:read",{roomId});
+    io.to(`room:${roomId}`).emit("message:read",{
+      roomId,
+      userId:req.user.id,
+      readAt:new Date().toISOString()
+    });
+
     res.json({ok:true,roomId});
   }catch(error){
     console.error("mark read:",error);
@@ -494,14 +500,26 @@ app.get("/api/rooms/:roomId/messages",requireAuth,async(req,res)=>{
   try{
     const roomId=req.params.roomId;
 
-    if (!(await isRoomMember(req.user.id, roomId))) {
+    if(!(await isRoomMember(req.user.id,roomId))){
       return res.status(403).json({error:"このルームへのアクセス権がありません。"});
     }
 
-    const {data,error}=await supabase.from("messages").select("id, room_id, sender_id, text, created_at").eq("room_id",roomId).order("created_at",{ascending:true}).limit(300);
+    const {data,error}=await supabase.from("messages").select("id, room_id, sender_id, text, reply_to_id, created_at").eq("room_id",roomId).order("created_at",{ascending:true}).limit(300);
+
     if(error)throw error;
 
-    res.json(data||[]);
+    const {data:members,error:membersError}=await supabase.from("room_members").select("user_id,last_read_at").eq("room_id",roomId);
+
+    if(membersError)throw membersError;
+
+    const otherMembers=(members||[]).filter(member=>member.user_id!==req.user.id);
+
+    const messages=(data||[]).map(message=>({
+      ...message,
+      read_by_all:otherMembers.length>0&&otherMembers.every(member=>member.last_read_at&&new Date(member.last_read_at)>=new Date(message.created_at))
+    }));
+
+    res.json(messages);
   }catch(error){
     console.error("messages:",error);
     res.status(500).json({error:"メッセージ取得に失敗しました。"});
@@ -514,13 +532,32 @@ app.post("/api/rooms/:roomId/messages",requireAuth,async(req,res)=>{
     const text=safeText(req.body.text,2000);
 
     if(!text)return res.status(400).json({error:"メッセージを入力してください。"});
-    if(!(await isRoomMember(req.user.id,roomId)))return res.status(403).json({error:"このルームへのアクセス権がありません。"});
+
+    if(!(await isRoomMember(req.user.id,roomId))){
+      return res.status(403).json({error:"このルームへのアクセス権がありません。"});
+    }
+
+    const replyToId=safeText(req.body.replyToId,100);
+    let replyTo=null;
+
+    if(replyToId){
+      const {data:parent,error:parentError}=await supabase.from("messages").select("id, room_id, sender_id, text, created_at").eq("id",replyToId).eq("room_id",roomId).maybeSingle();
+
+      if(parentError)throw parentError;
+
+      if(!parent){
+        return res.status(400).json({error:"返信先のメッセージが見つかりません。"});
+      }
+
+      replyTo=parent;
+    }
 
     const {data:message,error}=await supabase.from("messages").insert({
       room_id:roomId,
       sender_id:req.user.id,
-      text
-    }).select("id, room_id, sender_id, text, created_at").single();
+      text,
+      reply_to_id:replyToId||null
+    }).select("id, room_id, sender_id, text, reply_to_id, created_at").single();
 
     if(error)throw error;
 
@@ -529,6 +566,16 @@ app.post("/api/rooms/:roomId/messages",requireAuth,async(req,res)=>{
     await supabase.from("rooms").update({
       updated_at:new Date().toISOString()
     }).eq("id",roomId);
+
+    const {data:roomMembers,error:roomMembersError}=await supabase.from("room_members").select("user_id,last_read_at").eq("room_id",roomId);
+
+    if(roomMembersError)throw roomMembersError;
+
+    const otherMembers=(roomMembers||[]).filter(member=>member.user_id!==req.user.id);
+
+    message.read_by_all=otherMembers.length>0&&otherMembers.every(member=>member.last_read_at&&new Date(member.last_read_at)>=new Date(message.created_at));
+
+    message.reply_to=replyTo;
 
     io.to(`room:${roomId}`).emit("message:new",message);
     io.emit("rooms:changed");
@@ -562,6 +609,7 @@ app.get("/api/friends/requests",requireAuth,async(req,res)=>{
     `).eq("friend_id",req.user.id).eq("status","pending");
 
     if(error)throw error;
+
     res.json(data||[]);
   }catch(error){
     console.error("friend requests:",error);
@@ -576,22 +624,28 @@ async function createFriendshipPair(a,b){
   ];
 
   const {error}=await supabase.from("friendships").upsert(rows,{onConflict:"user_id,friend_id"});
+
   if(error)throw error;
 }
 
 async function findFriendRoom(userA,userB){
   const {data,error}=await supabase.from("room_members").select("room_id, rooms:room_id(id,name,type,owner_id,created_at,updated_at)").eq("user_id",userA);
+
   if(error)throw error;
 
   for(const item of data||[]){
     const candidate=item.rooms;
+
     if(!candidate||candidate.type!=="friend")continue;
 
     const {data:members}=await supabase.from("room_members").select("user_id").eq("room_id",candidate.id);
+
     const ids=(members||[]).map(m=>m.user_id).sort();
     const targetIds=[userA,userB].sort();
 
-    if(ids.length===2&&ids[0]===targetIds[0]&&ids[1]===targetIds[1])return candidate;
+    if(ids.length===2&&ids[0]===targetIds[0]&&ids[1]===targetIds[1]){
+      return candidate;
+    }
   }
 
   return null;
@@ -599,6 +653,7 @@ async function findFriendRoom(userA,userB){
 
 async function ensureFriendRoom(userId,friend){
   let room=await findFriendRoom(userId,friend.id);
+
   if(room)return room;
 
   const {data:newRoom,error:newRoomError}=await supabase.from("rooms").insert({
@@ -627,19 +682,26 @@ app.post("/api/friends/add",requireAuth,async(req,res)=>{
   try{
     const username=normalizeUsername(req.body.username);
 
-    if(!validUsername(username))return res.status(400).json({error:"有効なユーザー名を入力してください。"});
+    if(!validUsername(username)){
+      return res.status(400).json({error:"有効なユーザー名を入力してください。"});
+    }
 
     const {data:friend,error}=await supabase.from("users").select("id, username, display_name").eq("username",username).maybeSingle();
-    if(error)throw error;
 
+    if(error)throw error;
     if(!friend)return res.status(404).json({error:"ユーザーが見つかりません。"});
     if(friend.id===req.user.id)return res.status(400).json({error:"自分自身は追加できません。"});
 
     const {data:existingRel}=await supabase.from("friendships").select("status").eq("user_id",req.user.id).eq("friend_id",friend.id).maybeSingle();
 
     if(existingRel){
-      if(existingRel.status==="accepted")return res.status(400).json({error:"すでにフレンドです。"});
-      if(existingRel.status==="pending")return res.status(400).json({error:"すでにフレンド申請を送信済みです。"});
+      if(existingRel.status==="accepted"){
+        return res.status(400).json({error:"すでにフレンドです。"});
+      }
+
+      if(existingRel.status==="pending"){
+        return res.status(400).json({error:"すでにフレンド申請を送信済みです。"});
+      }
     }
 
     const {error:reqError}=await supabase.from("friendships").insert({
@@ -651,7 +713,11 @@ app.post("/api/friends/add",requireAuth,async(req,res)=>{
     if(reqError)throw reqError;
 
     io.to(`user:${friend.id}`).emit("friend:request",{from:req.user});
-    res.status(201).json({ok:true,message:"フレンド申請を送信しました。"});
+
+    res.status(201).json({
+      ok:true,
+      message:"フレンド申請を送信しました。"
+    });
   }catch(error){
     console.error("add friend:",error);
     res.status(500).json({error:"フレンド追加に失敗しました。"});
@@ -661,19 +727,36 @@ app.post("/api/friends/add",requireAuth,async(req,res)=>{
 app.post("/api/friends/accept",requireAuth,async(req,res)=>{
   try{
     const requesterId=req.body.requesterId;
-    if(!requesterId)return res.status(400).json({error:"申請IDが必要です。"});
+
+    if(!requesterId){
+      return res.status(400).json({error:"申請IDが必要です。"});
+    }
 
     const requester=await getUserById(requesterId);
-    if(!requester)return res.status(404).json({error:"ユーザーが見つかりません。"});
+
+    if(!requester){
+      return res.status(404).json({error:"ユーザーが見つかりません。"});
+    }
 
     await createFriendshipPair(req.user.id,requesterId);
 
     const room=await ensureFriendRoom(req.user.id,requester);
 
-    io.to(`user:${requesterId}`).emit("friend:new",{friend:req.user,room});
-    io.to(`user:${req.user.id}`).emit("friend:new",{friend:requester,room});
+    io.to(`user:${requesterId}`).emit("friend:new",{
+      friend:req.user,
+      room
+    });
 
-    res.json({ok:true,friend:requester,room});
+    io.to(`user:${req.user.id}`).emit("friend:new",{
+      friend:requester,
+      room
+    });
+
+    res.json({
+      ok:true,
+      friend:requester,
+      room
+    });
   }catch(error){
     console.error("accept friend:",error);
     res.status(500).json({error:"フレンド承認に失敗しました。"});
@@ -683,9 +766,13 @@ app.post("/api/friends/accept",requireAuth,async(req,res)=>{
 app.post("/api/friends/reject",requireAuth,async(req,res)=>{
   try{
     const requesterId=req.body.requesterId;
-    if(!requesterId)return res.status(400).json({error:"申請IDが必要です。"});
+
+    if(!requesterId){
+      return res.status(400).json({error:"申請IDが必要です。"});
+    }
 
     const {error}=await supabase.from("friendships").delete().eq("user_id",requesterId).eq("friend_id",req.user.id).eq("status","pending");
+
     if(error)throw error;
 
     res.json({ok:true});
@@ -698,15 +785,26 @@ app.post("/api/friends/reject",requireAuth,async(req,res)=>{
 app.post("/api/friends/qr",requireAuth,async(req,res)=>{
   try{
     const token=safeText(req.body.token,2000);
-    if(!token)return res.status(400).json({error:"QRデータがありません。"});
+
+    if(!token){
+      return res.status(400).json({error:"QRデータがありません。"});
+    }
 
     const payload=jwt.verify(token,process.env.JWT_SECRET,{issuer:"schat-qr"});
 
-    if(payload.type!=="friend_qr"||!payload.sub)return res.status(400).json({error:"無効なQRコードです。"});
+    if(payload.type!=="friend_qr"||!payload.sub){
+      return res.status(400).json({error:"無効なQRコードです。"});
+    }
 
     const friend=await getUserById(payload.sub);
-    if(!friend)return res.status(404).json({error:"ユーザーが見つかりません。"});
-    if(friend.id===req.user.id)return res.status(400).json({error:"自分のQRコードは追加できません。"});
+
+    if(!friend){
+      return res.status(404).json({error:"ユーザーが見つかりません。"});
+    }
+
+    if(friend.id===req.user.id){
+      return res.status(400).json({error:"自分のQRコードは追加できません。"});
+    }
 
     const existing=await findFriendRoom(req.user.id,friend.id);
 
@@ -724,7 +822,10 @@ app.post("/api/friends/qr",requireAuth,async(req,res)=>{
     const room=await ensureFriendRoom(req.user.id,friend);
 
     io.to(`user:${friend.id}`).emit("rooms:changed");
-    io.to(`user:${friend.id}`).emit("friend:new",{friend:req.user,room});
+    io.to(`user:${friend.id}`).emit("friend:new",{
+      friend:req.user,
+      room
+    });
     io.to(`user:${req.user.id}`).emit("rooms:changed");
 
     res.status(201).json({
@@ -761,6 +862,7 @@ app.delete("/api/friends/:friendId",requireAuth,async(req,res)=>{
     const friendId=req.params.friendId;
 
     const {error}=await supabase.from("friendships").delete().or(`and(user_id.eq.${req.user.id},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${req.user.id})`);
+
     if(error)throw error;
 
     io.to(`user:${req.user.id}`).emit("rooms:changed");
@@ -779,10 +881,16 @@ app.post("/api/rooms/:roomId/members",requireAuth,async(req,res)=>{
     const username=normalizeUsername(req.body.username);
     const room=await getRoom(roomId);
 
-    if(!room||room.type!=="group")return res.status(404).json({error:"グループが見つかりません。"});
-    if(room.owner_id!==req.user.id)return res.status(403).json({error:"グループ管理者のみ追加できます。"});
+    if(!room||room.type!=="group"){
+      return res.status(404).json({error:"グループが見つかりません。"});
+    }
+
+    if(room.owner_id!==req.user.id){
+      return res.status(403).json({error:"グループ管理者のみ追加できます。"});
+    }
 
     const {data:target,error:targetError}=await supabase.from("users").select("id,username,display_name").eq("username",username).maybeSingle();
+
     if(targetError)throw targetError;
     if(!target)return res.status(404).json({error:"ユーザーが見つかりません。"});
 
@@ -798,7 +906,10 @@ app.post("/api/rooms/:roomId/members",requireAuth,async(req,res)=>{
     io.to(`room:${roomId}`).emit("room:changed",{roomId});
     io.to(`user:${target.id}`).emit("rooms:changed");
 
-    res.json({ok:true,user:target});
+    res.json({
+      ok:true,
+      user:target
+    });
   }catch(error){
     console.error("group member:",error);
     res.status(500).json({error:"メンバー追加に失敗しました。"});
@@ -819,25 +930,38 @@ app.post("/api/rooms/:roomId/invites",requireAuth,async(req,res)=>{
     const roomId=req.params.roomId;
     const username=normalizeUsername(req.body.username);
 
-    if(!validUsername(username))return res.status(400).json({error:"有効なユーザー名を入力してください。"});
+    if(!validUsername(username)){
+      return res.status(400).json({error:"有効なユーザー名を入力してください。"});
+    }
 
     const room=await getRoom(roomId);
 
-    if(!room)return res.status(404).json({error:"グループが見つかりません。"});
-    if(room.type!=="group")return res.status(400).json({error:"グループにのみ招待できます。"});
-    if(!(await isRoomMember(req.user.id,roomId)))return res.status(403).json({error:"このグループのメンバーではありません。"});
+    if(!room){
+      return res.status(404).json({error:"グループが見つかりません。"});
+    }
+
+    if(room.type!=="group"){
+      return res.status(400).json({error:"グループにのみ招待できます。"});
+    }
+
+    if(!(await isRoomMember(req.user.id,roomId))){
+      return res.status(403).json({error:"このグループのメンバーではありません。"});
+    }
 
     const {data:target,error:targetError}=await supabase.from("users").select("id,username,display_name").eq("username",username).maybeSingle();
-    if(targetError)throw targetError;
 
+    if(targetError)throw targetError;
     if(!target)return res.status(404).json({error:"ユーザーが見つかりません。"});
     if(target.id===req.user.id)return res.status(400).json({error:"自分自身には招待できません。"});
     if(await isRoomMember(target.id,roomId))return res.status(409).json({error:"このユーザーは既にグループのメンバーです。"});
 
     const {data:existingInvite,error:existingError}=await supabase.from("room_invites").select("id,status").eq("room_id",roomId).eq("invitee_id",target.id).eq("status","pending").maybeSingle();
+
     if(existingError)throw existingError;
 
-    if(existingInvite)return res.status(409).json({error:"このユーザーには既に招待状を送っています。"});
+    if(existingInvite){
+      return res.status(409).json({error:"このユーザーには既に招待状を送っています。"});
+    }
 
     const {data:invite,error}=await supabase.from("room_invites").insert({
       room_id:roomId,
@@ -847,12 +971,19 @@ app.post("/api/rooms/:roomId/invites",requireAuth,async(req,res)=>{
     }).select("id").single();
 
     if(error){
-      if(error.code==="23505")return res.status(409).json({error:"このユーザーには既に招待状を送っています。"});
+      if(error.code==="23505"){
+        return res.status(409).json({error:"このユーザーには既に招待状を送っています。"});
+      }
+
       throw error;
     }
 
     await emitInviteToUser(target.id,invite.id);
-    res.status(201).json({ok:true,inviteId:invite.id});
+
+    res.status(201).json({
+      ok:true,
+      inviteId:invite.id
+    });
   }catch(error){
     console.error("send group invite:",error);
     res.status(500).json({error:"招待状の送信に失敗しました。"});
@@ -880,9 +1011,18 @@ app.post("/api/invites/:inviteId/accept",requireAuth,async(req,res)=>{
     `).eq("id",inviteId).eq("invitee_id",req.user.id).maybeSingle();
 
     if(inviteError)throw inviteError;
-    if(!invite)return res.status(404).json({error:"招待状が見つかりません。"});
-    if(invite.status!=="pending")return res.status(409).json({error:"この招待状は既に処理されています。"});
-    if(!invite.room||invite.room.type!=="group")return res.status(400).json({error:"このグループは存在しません。"});
+
+    if(!invite){
+      return res.status(404).json({error:"招待状が見つかりません。"});
+    }
+
+    if(invite.status!=="pending"){
+      return res.status(409).json({error:"この招待状は既に処理されています。"});
+    }
+
+    if(!invite.room||invite.room.type!=="group"){
+      return res.status(400).json({error:"このグループは存在しません。"});
+    }
 
     const {error:memberError}=await supabase.from("room_members").upsert({
       room_id:invite.room_id,
@@ -905,10 +1045,17 @@ app.post("/api/invites/:inviteId/accept",requireAuth,async(req,res)=>{
     }).eq("id",invite.room_id);
 
     io.to(`user:${req.user.id}`).emit("rooms:changed");
-    io.to(`room:${invite.room_id}`).emit("room:changed",{roomId:invite.room_id});
-    io.to(`user:${invite.inviter_id}`).emit("invite:changed",{roomId:invite.room_id});
+    io.to(`room:${invite.room_id}`).emit("room:changed",{
+      roomId:invite.room_id
+    });
+    io.to(`user:${invite.inviter_id}`).emit("invite:changed",{
+      roomId:invite.room_id
+    });
 
-    res.json({ok:true,room:invite.room});
+    res.json({
+      ok:true,
+      room:invite.room
+    });
   }catch(error){
     console.error("accept invite:",error);
     res.status(500).json({error:"招待の承認に失敗しました。"});
@@ -922,8 +1069,14 @@ app.post("/api/invites/:inviteId/reject",requireAuth,async(req,res)=>{
     const {data:invite,error:findError}=await supabase.from("room_invites").select("id,room_id,inviter_id,status").eq("id",inviteId).eq("invitee_id",req.user.id).maybeSingle();
 
     if(findError)throw findError;
-    if(!invite)return res.status(404).json({error:"招待状が見つかりません。"});
-    if(invite.status!=="pending")return res.status(409).json({error:"この招待状は既に処理されています。"});
+
+    if(!invite){
+      return res.status(404).json({error:"招待状が見つかりません。"});
+    }
+
+    if(invite.status!=="pending"){
+      return res.status(409).json({error:"この招待状は既に処理されています。"});
+    }
 
     const {error}=await supabase.from("room_invites").update({
       status:"rejected",
@@ -932,7 +1085,10 @@ app.post("/api/invites/:inviteId/reject",requireAuth,async(req,res)=>{
 
     if(error)throw error;
 
-    io.to(`user:${invite.inviter_id}`).emit("invite:changed",{roomId:invite.room_id});
+    io.to(`user:${invite.inviter_id}`).emit("invite:changed",{
+      roomId:invite.room_id
+    });
+
     res.json({ok:true});
   }catch(error){
     console.error("reject invite:",error);
@@ -950,10 +1106,12 @@ function addOnlineUser(userId){
 
 function removeOnlineUser(userId){
   const count=onlineUsers.get(userId)||0;
+
   if(count<=1){
     onlineUsers.delete(userId);
     return true;
   }
+
   onlineUsers.set(userId,count-1);
   return false;
 }
@@ -975,14 +1133,19 @@ io.on("connection",socket=>{
   socket.emit("presence:state",Array.from(onlineUsers.keys()));
 
   if(becameOnline){
-    io.emit("presence:update",{userId:user.id,online:true});
+    io.emit("presence:update",{
+      userId:user.id,
+      online:true
+    });
   }
 
   socket.on("room:join",async roomId=>{
     try{
       if(await isRoomMember(user.id,roomId)){
         for(const room of socket.rooms){
-          if(room.startsWith("room:"))socket.leave(room);
+          if(room.startsWith("room:")){
+            socket.leave(room);
+          }
         }
 
         socket.join(`room:${roomId}`);
@@ -998,7 +1161,14 @@ io.on("connection",socket=>{
     try{
       if(await isRoomMember(user.id,roomId)){
         await markRoomRead(user.id,roomId);
+
         socket.emit("room:read",{roomId});
+
+        io.to(`room:${roomId}`).emit("message:read",{
+          roomId,
+          userId:user.id,
+          readAt:new Date().toISOString()
+        });
       }
     }catch{}
   });
@@ -1009,7 +1179,10 @@ io.on("connection",socket=>{
     console.log(`socket disconnected: ${user.username}`);
 
     if(becameOffline){
-      io.emit("presence:update",{userId:user.id,online:false});
+      io.emit("presence:update",{
+        userId:user.id,
+        online:false
+      });
     }
   });
 });
