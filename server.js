@@ -575,22 +575,31 @@ async function getRoomsForUser(
     throw error;
   }
 
-  return (
-    data || []
-  )
-    .map(
-      x=>x.rooms
-    )
-    .filter(Boolean)
-    .sort(
-      (a,b)=>
-        new Date(
-          b.updated_at
-        )-
-        new Date(
-          a.updated_at
-        )
-    );
+  const roomList = (data || []).map(x => x.rooms).filter(Boolean);
+
+  for (let r of roomList) {
+    if (r.type === "friend") {
+      const { data: members } = await supabase
+        .from("room_members")
+        .select("user_id, users:user_id(id, username, display_name)")
+        .eq("room_id", r.id);
+
+      const other = (members || []).map(m => m.users).find(u => u && u.id !== userId);
+      if (other) {
+        r.name = other.display_name;
+      }
+    }
+  }
+
+  return roomList.sort(
+    (a,b)=>
+      new Date(
+        b.updated_at
+      )-
+      new Date(
+        a.updated_at
+      )
+  );
 }
 
 async function getContacts(
@@ -1178,6 +1187,18 @@ app.get(
           });
       }
 
+      if (room.type === "friend") {
+        const { data: members } = await supabase
+          .from("room_members")
+          .select("user_id, users:user_id(id, username, display_name)")
+          .eq("room_id", room.id);
+
+        const other = (members || []).map(m => m.users).find(u => u && u.id !== req.user.id);
+        if (other) {
+          room.name = other.display_name;
+        }
+      }
+
       res.json(room);
 
     }catch(error){
@@ -1494,6 +1515,47 @@ app.get(
   }
 );
 
+app.get(
+  "/api/friends/requests",
+  requireAuth,
+  async(req,res)=>{
+
+    try{
+
+      const { data, error } = await supabase
+        .from("friendships")
+        .select(`
+          user_id,
+          created_at,
+          user:user_id (
+            id,
+            username,
+            display_name
+          )
+        `)
+        .eq("friend_id", req.user.id)
+        .eq("status", "pending");
+
+      if (error) throw error;
+      res.json(data || []);
+
+    }catch(error){
+
+      console.error(
+        "friend requests:",
+        error
+      );
+
+      res
+        .status(500)
+        .json({
+          error:
+            "フレンド申請の取得に失敗しました。"
+        });
+    }
+  }
+);
+
 async function createFriendshipPair(
   a,
   b
@@ -1733,53 +1795,39 @@ app.post(
           });
       }
 
-      const existing=
-        await findFriendRoom(
-          req.user.id,
-          friend.id
-        );
+      const { data: existingRel } = await supabase
+        .from("friendships")
+        .select("status")
+        .eq("user_id", req.user.id)
+        .eq("friend_id", friend.id)
+        .maybeSingle();
 
-      await createFriendshipPair(
-        req.user.id,
-        friend.id
-      );
-
-      const room=
-        existing ||
-        await ensureFriendRoom(
-          req.user.id,
-          friend
-        );
-
-      io.to(
-        `user:${friend.id}`
-      ).emit(
-        "rooms:changed"
-      );
-
-      io.to(
-        `user:${friend.id}`
-      ).emit(
-        "friend:new",
-        {
-          friend:req.user,
-          room
+      if (existingRel) {
+        if (existingRel.status === "accepted") {
+          return res.status(400).json({ error: "すでにフレンドです。" });
+        } else if (existingRel.status === "pending") {
+          return res.status(400).json({ error: "すでにフレンド申請を送信済みです。" });
         }
-      );
+      }
 
-      io.to(
-        `user:${req.user.id}`
-      ).emit(
-        "rooms:changed"
-      );
-
-      res
-        .status(201)
-        .json({
-          friend,
-          room,
-          alreadyFriend:!!existing
+      const { error: reqError } = await supabase
+        .from("friendships")
+        .insert({
+          user_id: req.user.id,
+          friend_id: friend.id,
+          status: "pending"
         });
+
+      if (reqError) throw reqError;
+
+      io.to(`user:${friend.id}`).emit("friend:request", {
+        from: req.user
+      });
+
+      res.status(201).json({
+        ok: true,
+        message: "フレンド申請を送信しました。"
+      });
 
     }catch(error){
 
@@ -1793,6 +1841,102 @@ app.post(
         .json({
           error:
             "フレンド追加に失敗しました。"
+        });
+    }
+  }
+);
+
+app.post(
+  "/api/friends/accept",
+  requireAuth,
+  async(req,res)=>{
+
+    try{
+
+      const requesterId = req.body.requesterId;
+
+      if (!requesterId) {
+        return res.status(400).json({ error: "申請IDが必要です。" });
+      }
+
+      const requester = await getUserById(requesterId);
+      if (!requester) {
+        return res.status(404).json({ error: "ユーザーが見つかりません。" });
+      }
+
+      await createFriendshipPair(req.user.id, requesterId);
+
+      const room = await ensureFriendRoom(req.user.id, requester);
+
+      io.to(`user:${requesterId}`).emit("friend:new", {
+        friend: req.user,
+        room
+      });
+
+      io.to(`user:${req.user.id}`).emit("friend:new", {
+        friend: requester,
+        room
+      });
+
+      res.json({
+        ok: true,
+        friend: requester,
+        room
+      });
+
+    }catch(error){
+
+      console.error(
+        "accept friend:",
+        error
+      );
+
+      res
+        .status(500)
+        .json({
+          error:
+            "フレンド承認に失敗しました。"
+        });
+    }
+  }
+);
+
+app.post(
+  "/api/friends/reject",
+  requireAuth,
+  async(req,res)=>{
+
+    try{
+
+      const requesterId = req.body.requesterId;
+
+      if (!requesterId) {
+        return res.status(400).json({ error: "申請IDが必要です。" });
+      }
+
+      const { error } = await supabase
+        .from("friendships")
+        .delete()
+        .eq("user_id", requesterId)
+        .eq("friend_id", req.user.id)
+        .eq("status", "pending");
+
+      if (error) throw error;
+
+      res.json({ ok: true });
+
+    }catch(error){
+
+      console.error(
+        "reject friend:",
+        error
+      );
+
+      res
+        .status(500)
+        .json({
+          error:
+            "フレンド拒否に失敗しました。"
         });
     }
   }
@@ -1880,13 +2024,21 @@ app.post(
           friend.id
         );
 
+      if (existing) {
+        return res.status(200).json({
+          friend,
+          room: existing,
+          alreadyFriend: true,
+          message: "すでにフレンドです。"
+        });
+      }
+
       await createFriendshipPair(
         req.user.id,
         friend.id
       );
 
       const room=
-        existing ||
         await ensureFriendRoom(
           req.user.id,
           friend
@@ -1919,7 +2071,8 @@ app.post(
         .json({
           friend,
           room,
-          alreadyFriend:!!existing
+          alreadyFriend:false,
+          message: "フレンドを追加しました。"
         });
 
     }catch(error){
