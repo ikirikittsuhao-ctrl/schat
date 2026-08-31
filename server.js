@@ -654,6 +654,70 @@ app.post("/api/rooms/:roomId/messages",requireAuth,async(req,res)=>{
   }
 });
 
+app.put("/api/rooms/:roomId/messages/:messageId",requireAuth,async(req,res)=>{
+  try{
+    const {roomId,messageId}=req.params;
+    const text=safeText(req.body.text,2000);
+
+    if(!text)return res.status(400).json({error:"メッセージを入力してください。"});
+
+    if(!(await isRoomMember(req.user.id,roomId))){
+      return res.status(403).json({error:"このルームへのアクセス権がありません。"});
+    }
+
+    const {data:message,error:getError}=await supabase.from("messages").select("id, sender_id").eq("id",messageId).eq("room_id",roomId).maybeSingle();
+
+    if(getError)throw getError;
+    if(!message)return res.status(404).json({error:"メッセージが見つかりません。"});
+    if(message.sender_id!==req.user.id)return res.status(403).json({error:"自分のメッセージのみ編集できます。"});
+
+    const {error}=await supabase.from("messages").update({text}).eq("id",messageId);
+
+    if(error)throw error;
+
+    io.to(`room:${roomId}`).emit("message:updated",{
+      id:messageId,
+      text
+    });
+
+    res.json({ok:true});
+  }catch(error){
+    console.error("edit message:",error);
+    res.status(500).json({error:"メッセージ編集に失敗しました。"});
+  }
+});
+
+app.delete("/api/rooms/:roomId/messages/:messageId",requireAuth,async(req,res)=>{
+  try{
+    const {roomId,messageId}=req.params;
+
+    if(!(await isRoomMember(req.user.id,roomId))){
+      return res.status(403).json({error:"このルームへのアクセス権がありません。"});
+    }
+
+    const {data:message,error:getError}=await supabase.from("messages").select("id, sender_id").eq("id",messageId).eq("room_id",roomId).maybeSingle();
+
+    if(getError)throw getError;
+    if(!message)return res.status(404).json({error:"メッセージが見つかりません。"});
+    if(message.sender_id!==req.user.id)return res.status(403).json({error:"自分のメッセージのみ削除できます。"});
+
+    const {error}=await supabase.from("messages").delete().eq("id",messageId);
+
+    if(error)throw error;
+
+    io.to(`room:${roomId}`).emit("message:deleted",{
+      messageId
+    });
+
+    io.emit("rooms:changed");
+
+    res.json({ok:true});
+  }catch(error){
+    console.error("delete message:",error);
+    res.status(500).json({error:"メッセージ削除に失敗しました。"});
+  }
+});
+
 app.get("/api/friends",requireAuth,async(req,res)=>{
   try{
     res.json(await getContacts(req.user.id));
@@ -1254,8 +1318,8 @@ io.on("connection",socket=>{
   });
 });
 
-app.get("/{*splat}",(req,res)=>{
-  res.sendFile(path.join(__dirname,"public","index.html"));
+app.get("*",(req,res)=>{
+  res.sendFile(path.join(__dirname,"public","main.html"));
 });
 
 server.listen(PORT,()=>{
