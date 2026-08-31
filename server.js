@@ -9,6 +9,7 @@ const helmet=require("helmet");
 const cors=require("cors");
 const rateLimit=require("express-rate-limit");
 const cookieParser=require("cookie-parser");
+const multer=require("multer");
 const {Server}=require("socket.io");
 const {createClient}=require("@supabase/supabase-js");
 
@@ -38,6 +39,18 @@ const io=new Server(server,{
     credentials:true
   },
   transports:["websocket","polling"]
+});
+
+const upload=multer({
+  storage:multer.memoryStorage(),
+  limits:{fileSize:5*1024*1024},
+  fileFilter:(req,file,cb)=>{
+    if(file.mimetype.startsWith("image/")){
+      cb(null,true);
+    }else{
+      cb(new Error("画像ファイルのみアップロード可能です"));
+    }
+  }
 });
 
 app.set("trust proxy",1);
@@ -142,7 +155,7 @@ function clearAuthCookie(res){
 }
 
 async function getUserById(id){
-  const {data,error}=await supabase.from("users").select("id, username, display_name, created_at").eq("id",id).maybeSingle();
+  const {data,error}=await supabase.from("users").select("id, username, display_name, profile_icon_url, profile_bg_url, profile_desc, created_at").eq("id",id).maybeSingle();
   if(error)throw error;
   return data;
 }
@@ -225,12 +238,13 @@ async function getRoomsForUser(userId){
     r.unread_count=await getUnreadCount(r.id,item.last_read_at);
 
     if(r.type==="friend"){
-      const {data:members}=await supabase.from("room_members").select("user_id, users:user_id(id,username,display_name)").eq("room_id",r.id);
+      const {data:members}=await supabase.from("room_members").select("user_id, users:user_id(id,username,display_name,profile_icon_url)").eq("room_id",r.id);
       const other=(members||[]).map(m=>m.users).find(u=>u&&u.id!==userId);
       if(other){
         r.name=other.display_name;
         r.peer_id=other.id;
         r.peer_username=other.username;
+        r.peer_icon_url=other.profile_icon_url;
       }
     }
 
@@ -260,7 +274,8 @@ async function getContacts(userId){
     friend:friend_id (
       id,
       username,
-      display_name
+      display_name,
+      profile_icon_url
     )
   `).eq("user_id",userId).eq("status","accepted");
 
@@ -394,18 +409,56 @@ app.get("/api/auth/me",requireAuth,(req,res)=>{
   res.json({user:req.user});
 });
 
-app.put("/api/me",requireAuth,async(req,res)=>{
+app.put("/api/me",requireAuth,upload.fields([{name:"profileIcon",maxCount:1},{name:"profileBg",maxCount:1}]),async(req,res)=>{
   try{
     const displayName=String(req.body.displayName||"").trim();
+    const profileDesc=String(req.body.profileDesc||"").trim();
+    
     if(!validDisplayName(displayName))return res.status(400).json({error:"表示名は1〜40文字です。"});
 
-    const {data,error}=await supabase.from("users").update({display_name:displayName}).eq("id",req.user.id).select("id, username, display_name, created_at").single();
+    const updateData={
+      display_name:displayName,
+      profile_desc:profileDesc||null
+    };
+
+    if(req.files?.profileIcon&&req.files.profileIcon[0]){
+      const file=req.files.profileIcon[0];
+      const filename=`profile-icons/${req.user.id}-${Date.now()}`;
+      const {error}=await supabase.storage.from("uploads").upload(filename,file.buffer,{contentType:file.mimetype});
+      if(error)throw error;
+      const {data}=await supabase.storage.from("uploads").getPublicUrl(filename);
+      updateData.profile_icon_url=data.publicUrl;
+    }
+
+    if(req.files?.profileBg&&req.files.profileBg[0]){
+      const file=req.files.profileBg[0];
+      const filename=`profile-bgs/${req.user.id}-${Date.now()}`;
+      const {error}=await supabase.storage.from("uploads").upload(filename,file.buffer,{contentType:file.mimetype});
+      if(error)throw error;
+      const {data}=await supabase.storage.from("uploads").getPublicUrl(filename);
+      updateData.profile_bg_url=data.publicUrl;
+    }
+
+    const {data,error}=await supabase.from("users").update(updateData).eq("id",req.user.id).select("id, username, display_name, profile_icon_url, profile_bg_url, profile_desc, created_at").single();
     if(error)throw error;
 
     res.json({user:data});
   }catch(error){
     console.error("profile:",error);
     res.status(500).json({error:"プロフィール更新に失敗しました。"});
+  }
+});
+
+app.get("/api/users/:userId",async(req,res)=>{
+  try{
+    const user=await getUserById(req.params.userId);
+    if(!user)return res.status(404).json({error:"ユーザーが見つかりません。"});
+
+    const online=onlineUsers.has(user.id);
+    res.json({user:{...user,online}});
+  }catch(error){
+    console.error("get user:",error);
+    res.status(500).json({error:"ユーザー取得に失敗しました。"});
   }
 });
 
@@ -504,7 +557,7 @@ app.get("/api/rooms/:roomId/messages",requireAuth,async(req,res)=>{
       return res.status(403).json({error:"このルームへのアクセス権がありません。"});
     }
 
-    const {data,error}=await supabase.from("messages").select("id, room_id, sender_id, text, reply_to_id, created_at").eq("room_id",roomId).order("created_at",{ascending:true}).limit(300);
+    const {data,error}=await supabase.from("messages").select("id, room_id, sender_id, text, reply_to_id, created_at, users:sender_id(id, username, display_name, profile_icon_url)").eq("room_id",roomId).order("created_at",{ascending:true}).limit(300);
 
     if(error)throw error;
 
@@ -514,10 +567,20 @@ app.get("/api/rooms/:roomId/messages",requireAuth,async(req,res)=>{
 
     const otherMembers=(members||[]).filter(member=>member.user_id!==req.user.id);
 
-    const messages=(data||[]).map(message=>({
-      ...message,
-      read_by_all:otherMembers.length>0&&otherMembers.every(member=>member.last_read_at&&new Date(member.last_read_at)>=new Date(message.created_at))
-    }));
+    const messages=(data||[]).map(message=>{
+      const sender=message.users||{};
+      return {
+        id:message.id,
+        room_id:message.room_id,
+        sender_id:message.sender_id,
+        sender_name:sender.display_name||"ユーザー",
+        sender_icon_url:sender.profile_icon_url,
+        text:message.text,
+        reply_to_id:message.reply_to_id,
+        created_at:message.created_at,
+        read_by_all:otherMembers.length>0&&otherMembers.every(member=>member.last_read_at&&new Date(member.last_read_at)>=new Date(message.created_at))
+      };
+    });
 
     res.json(messages);
   }catch(error){
@@ -573,14 +636,18 @@ app.post("/api/rooms/:roomId/messages",requireAuth,async(req,res)=>{
 
     const otherMembers=(roomMembers||[]).filter(member=>member.user_id!==req.user.id);
 
-    message.read_by_all=otherMembers.length>0&&otherMembers.every(member=>member.last_read_at&&new Date(member.last_read_at)>=new Date(message.created_at));
+    const msgData={
+      ...message,
+      sender_name:req.user.display_name,
+      sender_icon_url:req.user.profile_icon_url,
+      reply_to:replyTo,
+      read_by_all:otherMembers.length>0&&otherMembers.every(member=>member.last_read_at&&new Date(member.last_read_at)>=new Date(message.created_at))
+    };
 
-    message.reply_to=replyTo;
-
-    io.to(`room:${roomId}`).emit("message:new",message);
+    io.to(`room:${roomId}`).emit("message:new",msgData);
     io.emit("rooms:changed");
 
-    res.status(201).json(message);
+    res.status(201).json(msgData);
   }catch(error){
     console.error("send message:",error);
     res.status(500).json({error:"メッセージ送信に失敗しました。"});
