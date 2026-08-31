@@ -685,26 +685,111 @@ if (!isMe) {
   }
 }
 
-const actionButtonsHtml = `
-  <div class="msg-actions" style="display:none">
-    <button onclick="setReplyTarget({id:'${m.id}',text:'${m.text.replace(/'/g,"\\'")}',sender_id:${m.sender_id},sender_name:'${m.sender_name.replace(/'/g,"\\'")}'})"><i class="fa-solid fa-reply"></i></button>
-    ${isMe ? `<button onclick="editMessage('${m.id}')"><i class="fa-solid fa-pen"></i></button>
-    <button onclick="deleteMessage('${m.id}')"><i class="fa-solid fa-trash"></i></button>` : ''}
-  </div>
-`;
-
 row.innerHTML = `
   ${avatarHtml}
   <div class="msg-content-wrap">
     ${senderNameHtml}
-    <div class="msg ${isMe ? "me" : "other"}" data-message-id="${m.id}" data-reply-to-id="${m.reply_to_id || ""}" ondblclick="showMessageActions(this, {id:'${m.id}', sender_id:${m.sender_id}})">
-      ${actionButtonsHtml}
+    <div class="msg ${isMe ? "me" : "other"}" data-message-id="${m.id}" data-reply-to-id="${m.reply_to_id || ""}">
       ${replyHtml}
       <span data-text-content>${escapeHTML(m.text).replace(/\n/g, "<br>")}</span>
     </div>
   </div>
   ${metaHtml}
 `;
+
+const msgEl = row.querySelector(".msg");
+
+msgEl.ondblclick = () => {
+  if (isMe) {
+    if (confirm("メッセージの操作を選択してください\nOK: 編集 / キャンセル: 削除")) {
+      editMessage(m.id);
+    } else {
+      deleteMessage(m.id);
+    }
+  }
+};
+
+let startX = 0;
+let startY = 0;
+let currentX = 0;
+let isSwiping = false;
+
+msgEl.addEventListener("touchstart", (e) => {
+  startX = e.touches[0].clientX;
+  startY = e.touches[0].clientY;
+  currentX = 0;
+  isSwiping = false;
+  msgEl.style.transition = "none";
+}, { passive: true });
+
+msgEl.addEventListener("touchmove", (e) => {
+  const diffX = e.touches[0].clientX - startX;
+  const diffY = e.touches[0].clientY - startY;
+
+  if (!isSwiping && Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 10) {
+    isSwiping = true;
+  }
+
+  if (isSwiping) {
+    currentX = diffX;
+    msgEl.style.transform = `translateX(${currentX}px)`;
+  }
+}, { passive: true });
+
+msgEl.addEventListener("touchend", () => {
+  msgEl.style.transition = "transform .15s ease";
+  if (Math.abs(currentX) > 60) {
+    setReplyTarget({
+      id: m.id,
+      text: m.text,
+      sender_id: m.sender_id,
+      sender_name: m.sender_name || ""
+    });
+  }
+  msgEl.style.transform = "translateX(0px)";
+  isSwiping = false;
+});
+
+msgEl.addEventListener("mousedown", (e) => {
+  startX = e.clientX;
+  startY = e.clientY;
+  currentX = 0;
+  isSwiping = false;
+  msgEl.style.transition = "none";
+
+  const onMouseMove = (me) => {
+    const diffX = me.clientX - startX;
+    const diffY = me.clientY - startY;
+
+    if (!isSwiping && Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 10) {
+      isSwiping = true;
+    }
+
+    if (isSwiping) {
+      currentX = diffX;
+      msgEl.style.transform = `translateX(${currentX}px)`;
+    }
+  };
+
+  const onMouseUp = () => {
+    document.removeEventListener("mousemove", onMouseMove);
+    document.removeEventListener("mouseup", onMouseUp);
+    msgEl.style.transition = "transform .15s ease";
+    if (Math.abs(currentX) > 60) {
+      setReplyTarget({
+        id: m.id,
+        text: m.text,
+        sender_id: m.sender_id,
+        sender_name: m.sender_name || ""
+      });
+    }
+    msgEl.style.transform = "translateX(0px)";
+    isSwiping = false;
+  };
+
+  document.addEventListener("mousemove", onMouseMove);
+  document.addEventListener("mouseup", onMouseUp);
+});
 
 $("messages").appendChild(row);
 if (scroll) scrollMessages();
