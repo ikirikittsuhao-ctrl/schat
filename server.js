@@ -418,10 +418,10 @@ app.put("/api/me",requireAuth,upload.fields([{name:"profileIcon",maxCount:1},{na
 
     const updateData={
       display_name:displayName,
-      profile_desc:profileDesc||null
+      profile_desc:safeText(profileDesc,200)||null
     };
 
-    if(req.files?.profileIcon&&req.files.profileIcon[0]){
+    if(req.files?.profileIcon?.[0]){
       const file=req.files.profileIcon[0];
       const filename=`profile-icons/${req.user.id}-${Date.now()}`;
       const {error}=await supabase.storage.from("uploads").upload(filename,file.buffer,{contentType:file.mimetype});
@@ -430,7 +430,7 @@ app.put("/api/me",requireAuth,upload.fields([{name:"profileIcon",maxCount:1},{na
       updateData.profile_icon_url=data.publicUrl;
     }
 
-    if(req.files?.profileBg&&req.files.profileBg[0]){
+    if(req.files?.profileBg?.[0]){
       const file=req.files.profileBg[0];
       const filename=`profile-bgs/${req.user.id}-${Date.now()}`;
       const {error}=await supabase.storage.from("uploads").upload(filename,file.buffer,{contentType:file.mimetype});
