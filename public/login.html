@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#06c755">
+<title>schat</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<style>
+:root{
+  --bg:#7294c2;
+  --chat-bg:#8cabd9;
+  --surface:#ffffff;
+  --surface2:#f4f5f7;
+  --border:#e6ebf0;
+  --text:#111111;
+  --muted:#8e8e93;
+  --primary:#06c755;
+  --primary2:#05b34c;
+  --my-msg-bg:#85e249;
+  --danger:#ff3b30;
+  --shadow:0 8px 30px rgba(0,0,0,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Hiragino Kaku Gothic ProN", "メイリオ", meiryo, sans-serif;
+  background:var(--chat-bg);
+  color:var(--text);
+  height:100dvh;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.auth{position:fixed;inset:0;background:linear-gradient(135deg,#e8f9ee,#f4fbf7);display:grid;place-items:center;padding:18px;z-index:100}
+.auth-card{width:min(410px,100%);background:#fff;border:1px solid var(--border);border-radius:24px;padding:28px;box-shadow:var(--shadow)}
+.auth-card h1{margin-bottom:6px;color:var(--primary);font-weight:800}
+.auth-card p{color:var(--muted);font-size:13px;margin-bottom:20px}
+.auth-card input{width:100%;padding:12px;margin-bottom:12px;border:1px solid var(--border);border-radius:12px;outline:0;background:var(--surface2);font-family:inherit}
+.auth-card input:focus{background:#fff;border-color:var(--primary)}
+.btn{border:0;border-radius:12px;padding:13px;font-size:15px;width:100%;font-weight:700;cursor:pointer;background:var(--primary);color:#fff;transition:background .15s}
+.btn:hover{background:var(--primary2)}
+.auth-switch{text-align:center;margin-top:16px;font-size:12.5px;color:var(--muted)}
+.auth-switch button{border:0;background:none;color:var(--primary);font-weight:700;cursor:pointer}
+#authError{margin-top:10px;color:#dc2626;font-size:12px}
+</style>
+</head>
+<body>
+<div class="auth">
+<div class="auth-card">
+<h1><i class="fa-solid fa-comments"></i> schat</h1>
+<p id="authDesc">ユーザー名とパスワードでログイン</p>
+<input id="authUser" autocomplete="username" placeholder="ユーザー名">
+<input id="authPass" autocomplete="current-password" type="password" placeholder="パスワード">
+<input id="authName" class="hidden" autocomplete="name" placeholder="表示名" style="display:none">
+<button class="btn" id="authBtn">ログイン</button>
+<div class="auth-switch"><span id="authSwitchText">アカウントを作成する</span><button id="authSwitch">新規登録</button></div>
+<div id="authError"></div>
+</div>
+</div>
+<script>
+let registerMode=false;
+const $=id=>document.getElementById(id);
+function setAuthMode(reg){
+  registerMode=reg;
+  const nameInput=$("authName");
+  nameInput.style.display=reg?"block":"none";
+  $("authBtn").textContent=reg?"アカウント作成":"ログイン";
+  $("authDesc").textContent=reg?"新しいschatアカウントを作成":"ユーザー名とパスワードでログイン";
+  $("authSwitchText").textContent=reg?"既にアカウントがありますか？":"アカウントを作成する";
+  $("authSwitch").textContent=reg?"ログイン":"新規登録";
+}
+$("authSwitch").onclick=()=>setAuthMode(!registerMode);
+$("authBtn").onclick=async()=>{
+  try{
+    $("authError").textContent="";
+    const body={username:$("authUser").value,password:$("authPass").value};
+    if(registerMode)body.displayName=$("authName").value;
+    const r=await fetch(registerMode?"/api/auth/register":"/api/auth/login",{
+      method:"POST",
+      credentials:"include",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(body)
+    });
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||"通信エラー");
+    window.location.href="/main.html";
+  }catch(e){
+    $("authError").textContent=e.message||String(e);
+  }
+};
+$("authPass").addEventListener("keydown",e=>{if(e.key==="Enter")$("authBtn").click()});
+async function boot(){
+  try{
+    const r=await fetch("/api/auth/me",{credentials:"include"});
+    if(r.ok){
+      window.location.href="/main.html";
+    }
+  }catch{}
+}
+boot();
+</script>
+</body>
+</html>
