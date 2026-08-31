@@ -2,101 +2,379 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#06c755">
 <title>schat</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <style>
-:root{
-  --bg:#7294c2;
-  --chat-bg:#8cabd9;
-  --surface:#ffffff;
-  --surface2:#f4f5f7;
-  --border:#e6ebf0;
-  --text:#111111;
-  --muted:#8e8e93;
-  --primary:#06c755;
-  --primary2:#05b34c;
-  --my-msg-bg:#85e249;
-  --danger:#ff3b30;
-  --shadow:0 8px 30px rgba(0,0,0,.06);
+:root {
+  --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --surface: rgba(255, 255, 255, 0.92);
+  --border: rgba(226, 232, 240, 0.8);
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --primary: #06c755;
+  --primary-hover: #05b34c;
+  --primary-glow: rgba(6, 199, 85, 0.25);
+  --danger: #ef4444;
+  --shadow-lg: 0 20px 40px -15px rgba(0, 0, 0, 0.15), 0 10px 15px -10px rgba(0, 0, 0, 0.05);
+  --radius-lg: 24px;
+  --radius-md: 14px;
+  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
-*{box-sizing:border-box;margin:0;padding:0}
-body{
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Hiragino Kaku Gothic ProN", "メイリオ", meiryo, sans-serif;
-  background:var(--chat-bg);
-  color:var(--text);
-  height:100dvh;
-  overflow:hidden;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
-.auth{position:fixed;inset:0;background:linear-gradient(135deg,#e8f9ee,#f4fbf7);display:grid;place-items:center;padding:18px;z-index:100}
-.auth-card{width:min(410px,100%);background:#fff;border:1px solid var(--border);border-radius:24px;padding:28px;box-shadow:var(--shadow)}
-.auth-card h1{margin-bottom:6px;color:var(--primary);font-weight:800}
-.auth-card p{color:var(--muted);font-size:13px;margin-bottom:20px}
-.auth-card input{width:100%;padding:12px;margin-bottom:12px;border:1px solid var(--border);border-radius:12px;outline:0;background:var(--surface2);font-family:inherit}
-.auth-card input:focus{background:#fff;border-color:var(--primary)}
-.btn{border:0;border-radius:12px;padding:13px;font-size:15px;width:100%;font-weight:700;cursor:pointer;background:var(--primary);color:#fff;transition:background .15s}
-.btn:hover{background:var(--primary2)}
-.auth-switch{text-align:center;margin-top:16px;font-size:12.5px;color:var(--muted)}
-.auth-switch button{border:0;background:none;color:var(--primary);font-weight:700;cursor:pointer}
-#authError{margin-top:10px;color:#dc2626;font-size:12px}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  background: var(--bg-gradient);
+  color: var(--text-main);
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  position: relative;
+}
+
+/* 背景用のアニメーション装飾 */
+.bg-bubbles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.bg-bubbles div {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(5px);
+  animation: float 12s infinite ease-in-out;
+}
+
+.bg-bubbles div:nth-child(1) { width: 300px; height: 300px; top: -50px; left: -50px; animation-delay: 0s; }
+.bg-bubbles div:nth-child(2) { width: 200px; height: 200px; bottom: -30px; right: -30px; animation-delay: -4s; }
+.bg-bubbles div:nth-child(3) { width: 150px; height: 150px; top: 40%; right: 15%; animation-delay: -8s; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-30px) scale(1.05); }
+}
+
+/* 認証コンテナ */
+.auth {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 92%);
+  padding: 16px;
+  animation: cardFadeIn 0.6s var(--transition-bounce) forwards;
+}
+
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.auth-card {
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: var(--radius-lg);
+  padding: 36px 30px;
+  box-shadow: var(--shadow-lg);
+}
+
+.auth-card header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.auth-card h1 {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  letter-spacing: -0.5px;
+}
+
+.auth-card h1 i {
+  font-size: 30px;
+  filter: drop-shadow(0 4px 8px var(--primary-glow));
+}
+
+.auth-card p {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-top: 6px;
+  transition: opacity var(--transition-fast);
+}
+
+/* フォームフィールド */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-wrapper i {
+  position: absolute;
+  left: 14px;
+  color: var(--text-muted);
+  font-size: 15px;
+  transition: color var(--transition-fast);
+}
+
+.input-field {
+  width: 100%;
+  padding: 14px 14px 14px 42px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  outline: none;
+  background: rgba(248, 250, 252, 0.8);
+  font-size: 14.5px;
+  font-family: inherit;
+  color: var(--text-main);
+  transition: all var(--transition-fast);
+}
+
+.input-field::placeholder {
+  color: #94a3b8;
+}
+
+.input-field:focus {
+  background: #ffffff;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--primary-glow);
+}
+
+.input-field:focus + i {
+  color: var(--primary);
+}
+
+/* アニメーション対応の動的表示フィールド */
+.toggle-field {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateY(-10px);
+  transition: max-height 0.3s ease, opacity 0.3s ease, transform 0.3s ease, margin 0.3s ease;
+}
+
+.toggle-field.visible {
+  max-height: 60px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ボタン */
+.btn {
+  margin-top: 8px;
+  border: 0;
+  border-radius: var(--radius-md);
+  padding: 15px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 12px var(--primary-glow);
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px var(--primary-glow);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+/* スイッチテキスト */
+.auth-switch {
+  text-align: center;
+  margin-top: 22px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+}
+
+.auth-switch button {
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font-weight: 700;
+  font-size: inherit;
+  cursor: pointer;
+  margin-left: 6px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  transition: background var(--transition-fast);
+}
+
+.auth-switch button:hover {
+  background: rgba(6, 199, 85, 0.08);
+  text-decoration: underline;
+}
+
+/* エラーメッセージ */
+#authError {
+  margin-top: 14px;
+  color: var(--danger);
+  font-size: 13px;
+  text-align: center;
+  font-weight: 500;
+  min-height: 18px;
+  animation: shake 0.4s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
 </style>
 </head>
 <body>
+
+<div class="bg-bubbles">
+  <div></div>
+  <div></div>
+  <div></div>
+</div>
+
 <div class="auth">
-<div class="auth-card">
-<h1><i class="fa-solid fa-comments"></i> schat</h1>
-<p id="authDesc">ユーザー名とパスワードでログイン</p>
-<input id="authUser" autocomplete="username" placeholder="ユーザー名">
-<input id="authPass" autocomplete="current-password" type="password" placeholder="パスワード">
-<input id="authName" class="hidden" autocomplete="name" placeholder="表示名" style="display:none">
-<button class="btn" id="authBtn">ログイン</button>
-<div class="auth-switch"><span id="authSwitchText">アカウントを作成する</span><button id="authSwitch">新規登録</button></div>
-<div id="authError"></div>
+  <div class="auth-card">
+    <header>
+      <h1><i class="fa-solid fa-comments"></i> schat</h1>
+      <p id="authDesc">ユーザー名とパスワードでログイン</p>
+    </header>
+    
+    <div class="form-group">
+      <div class="input-wrapper">
+        <input id="authUser" class="input-field" autocomplete="username" placeholder="ユーザー名">
+        <i class="fa-solid fa-user"></i>
+      </div>
+      
+      <div class="input-wrapper">
+        <input id="authPass" class="input-field" autocomplete="current-password" type="password" placeholder="パスワード">
+        <i class="fa-solid fa-lock"></i>
+      </div>
+      
+      <div id="nameWrapper" class="input-wrapper toggle-field">
+        <input id="authName" class="input-field" autocomplete="name" placeholder="表示名">
+        <i class="fa-solid fa-id-card"></i>
+      </div>
+      
+      <button class="btn" id="authBtn">
+        <span>ログイン</span>
+        <i class="fa-solid fa-arrow-right-to-bracket"></i>
+      </button>
+    </div>
+    
+    <div class="auth-switch">
+      <span id="authSwitchText">アカウントを作成する</span>
+      <button id="authSwitch">新規登録</button>
+    </div>
+    
+    <div id="authError"></div>
+  </div>
 </div>
-</div>
+
 <script>
-let registerMode=false;
-const $=id=>document.getElementById(id);
-function setAuthMode(reg){
-  registerMode=reg;
-  const nameInput=$("authName");
-  nameInput.style.display=reg?"block":"none";
-  $("authBtn").textContent=reg?"アカウント作成":"ログイン";
-  $("authDesc").textContent=reg?"新しいschatアカウントを作成":"ユーザー名とパスワードでログイン";
-  $("authSwitchText").textContent=reg?"既にアカウントがありますか？":"アカウントを作成する";
-  $("authSwitch").textContent=reg?"ログイン":"新規登録";
+let registerMode = false;
+const $ = id => document.getElementById(id);
+
+function setAuthMode(reg) {
+  registerMode = reg;
+  const nameWrapper = $("nameWrapper");
+  const authBtn = $("authBtn");
+  
+  if (reg) {
+    nameWrapper.classList.add("visible");
+    authBtn.innerHTML = `<span>アカウント作成</span> <i class="fa-solid fa-user-plus"></i>`;
+  } else {
+    nameWrapper.classList.remove("visible");
+    authBtn.innerHTML = `<span>ログイン</span> <i class="fa-solid fa-arrow-right-to-bracket"></i>`;
+  }
+  
+  $("authDesc").textContent = reg ? "新しいschatアカウントを作成" : "ユーザー名とパスワードでログイン";
+  $("authSwitchText").textContent = reg ? "既にアカウントがありますか？" : "アカウントを作成する";
+  $("authSwitch").textContent = reg ? "ログイン" : "新規登録";
+  $("authError").textContent = "";
 }
-$("authSwitch").onclick=()=>setAuthMode(!registerMode);
-$("authBtn").onclick=async()=>{
-  try{
-    $("authError").textContent="";
-    const body={username:$("authUser").value,password:$("authPass").value};
-    if(registerMode)body.displayName=$("authName").value;
-    const r=await fetch(registerMode?"/api/auth/register":"/api/auth/login",{
-      method:"POST",
-      credentials:"include",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(body)
+
+$("authSwitch").onclick = () => setAuthMode(!registerMode);
+
+$("authBtn").onclick = async () => {
+  try {
+    const errorEl = $("authError");
+    errorEl.textContent = "";
+    
+    const body = { username: $("authUser").value, password: $("authPass").value };
+    if (registerMode) body.displayName = $("authName").value;
+    
+    const r = await fetch(registerMode ? "/api/auth/register" : "/api/auth/login", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
     });
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok)throw new Error(d.error||"通信エラー");
-    window.location.href="/main.html";
-  }catch(e){
-    $("authError").textContent=e.message||String(e);
+    
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || "通信エラーが発生しました");
+    
+    window.location.href = "/main.html";
+  } catch (e) {
+    const errorEl = $("authError");
+    errorEl.textContent = e.message || String(e);
+    // アニメーションの再トリガー
+    errorEl.style.animation = 'none';
+    errorEl.offsetHeight; /* reflow */
+    errorEl.style.animation = null;
   }
 };
-$("authPass").addEventListener("keydown",e=>{if(e.key==="Enter")$("authBtn").click()});
-async function boot(){
-  try{
-    const r=await fetch("/api/auth/me",{credentials:"include"});
-    if(r.ok){
-      window.location.href="/main.html";
+
+$("authPass").addEventListener("keydown", e => {
+  if (e.key === "Enter") $("authBtn").click();
+});
+
+$("authName").addEventListener("keydown", e => {
+  if (e.key === "Enter") $("authBtn").click();
+});
+
+async function boot() {
+  try {
+    const r = await fetch("/api/auth/me", { credentials: "include" });
+    if (r.ok) {
+      window.location.href = "/main.html";
     }
-  }catch{}
+  } catch {}
 }
 boot();
 </script>
