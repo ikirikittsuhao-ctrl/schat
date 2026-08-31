@@ -39,7 +39,7 @@ button,input{
 button{cursor:pointer}
 .hidden{display:none!important}
 .app{height:100dvh;max-width:100%;margin:auto;display:flex;background:var(--surface);box-shadow:var(--shadow);position:relative}
-.sidebar{width:var(--sidebar-width);min-width:260px;max-width:600px;border-right:1px solid var(--border);display:flex;flex-direction:column;background:#fff;position:relative;user-select:none;transition:width .2s ease}
+.sidebar{width:var(--sidebar-width);min-width:260px;max-width:600px;border-right:1px solid var(--border);display:flex;flex-direction:column;background:#fff;position:relative;user-select:none;transition:width 0.3s cubic-bezier(0.4, 0, 0.2, 1)}
 .sidebar.collapsed{width:70px!important;min-width:70px!important;max-width:70px!important}
 .sidebar.collapsed .brand-text,
 .sidebar.collapsed .top-actions,
@@ -48,7 +48,7 @@ button{cursor:pointer}
 .sidebar.collapsed .nav-text,
 .sidebar.collapsed .invite-badge,
 .sidebar.collapsed .resizer{display:none!important}
-.sidebar.collapsed .topbar{justify-content:center;padding:0;gap:8px}
+.sidebar.collapsed .topbar{justify-content:center;padding:12px 0;gap:12px;flex-direction:column;height:auto}
 .sidebar.collapsed .brand{justify-content:center}
 .sidebar.collapsed .brand i{margin-right:0}
 .sidebar.collapsed .nav{flex-direction:column;height:auto;padding:10px 0;gap:15px;align-items:center}
@@ -56,7 +56,7 @@ button{cursor:pointer}
 .sidebar.collapsed .nav button i{margin-bottom:0;font-size:22px}
 .resizer{width:5px;cursor:col-resize;position:absolute;right:-3px;top:0;bottom:0;z-index:20;background:transparent;transition:background .2s}
 .resizer:hover,.resizer.resizing{background:rgba(6,199,85,0.4)}
-.topbar{height:68px;padding:0 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:#fff}
+.topbar{height:68px;padding:0 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:#fff;transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1)}
 .brand{font-size:22px;font-weight:800;letter-spacing:-.5px;display:flex;align-items:center;color:var(--primary)}
 .brand i{color:var(--primary);margin-right:7px;font-size:24px}
 .top-actions{display:flex;gap:7px}
