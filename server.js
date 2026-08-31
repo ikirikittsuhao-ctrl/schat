@@ -1318,7 +1318,7 @@ io.on("connection",socket=>{
   });
 });
 
-app.get("*",(req,res)=>{
+app.get("/{*splat}",(req,res)=>{
   res.sendFile(path.join(__dirname,"public","main.html"));
 });
 
