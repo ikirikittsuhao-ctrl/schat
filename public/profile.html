@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#06c755">
+<title>プロフィール - schat</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<style>
+:root{
+  --bg:#7294c2;
+  --chat-bg:#8cabd9;
+  --surface:#ffffff;
+  --surface2:#f4f5f7;
+  --border:#e6ebf0;
+  --text:#ffffff;
+  --muted:#e0e0e0;
+  --primary:#06c755;
+  --primary2:#05b34c;
+  --danger:#ff3b30;
+  --shadow:0 8px 30px rgba(0,0,0,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Hiragino Kaku Gothic ProN", "メイリオ", meiryo, sans-serif;
+  background:#000;
+  color:var(--text);
+  min-height:100dvh;
+  padding:0;
+}
+.profile-container{
+  max-width:600px;
+  margin:0 auto;
+  min-height:100dvh;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  position:relative;
+  overflow:hidden;
+}
+.profile-bg{
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  background:linear-gradient(135deg,#06c755,#34d399);
+  background-size:cover;
+  background-position:center;
+  z-index:1;
+}
+.profile-bg::after{
+  content:'';
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  background:linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.4) 100%);
+}
+.profile-header{
+  padding:0;
+  text-align:center;
+  position:relative;
+  z-index:2;
+  margin-top:auto;
+  margin-bottom:20px;
+}
+.profile-header-content{
+  position:relative;
+  z-index:2;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+.profile-avatar{
+  width:90px;
+  height:90px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#06c755,#34d399);
+  color:#fff;
+  display:grid;
+  place-items:center;
+  font-size:35px;
+  box-shadow:0 4px 15px rgba(0,0,0,0.3);
+  border:2px solid rgba(255,255,255,0.8);
+  overflow:hidden;
+  margin-bottom:12px;
+}
+.profile-avatar img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+.profile-name{
+  font-size:22px;
+  font-weight:700;
+  margin-bottom:4px;
+  color:#fff;
+  text-shadow:0 1px 4px rgba(0,0,0,0.6);
+}
+.profile-username{
+  font-size:13px;
+  color:var(--muted);
+  margin-bottom:8px;
+  text-shadow:0 1px 3px rgba(0,0,0,0.6);
+}
+.profile-status{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:4px 12px;
+  background:rgba(0,0,0,0.4);
+  color:#fff;
+  border-radius:20px;
+  font-size:12px;
+  font-weight:500;
+  backdrop-filter:blur(4px);
+}
+.profile-status.offline{
+  background:rgba(0,0,0,0.4);
+  color:var(--muted);
+}
+.profile-desc{
+  padding:0 20px 20px;
+  position:relative;
+  z-index:2;
+  text-align:center;
+}
+.profile-desc-title{
+  font-size:11px;
+  color:var(--muted);
+  font-weight:600;
+  margin-bottom:4px;
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+  display:none;
+}
+.profile-desc-text{
+  font-size:14px;
+  line-height:1.5;
+  color:rgba(255,255,255,0.9);
+  text-shadow:0 1px 3px rgba(0,0,0,0.6);
+}
+.profile-desc-empty{
+  font-size:13px;
+  color:var(--muted);
+  font-style:italic;
+}
+.profile-actions{
+  padding:20px 30px 40px;
+  position:relative;
+  z-index:2;
+  display:flex;
+  gap:20px;
+  justify-content:center;
+  border-top:1px solid rgba(255,255,255,0.2);
+}
+.btn{
+  flex:1;
+  max-width:140px;
+  padding:10px;
+  border:none;
+  border-radius:12px;
+  background:rgba(255,255,255,0.2);
+  color:#fff;
+  font-weight:600;
+  font-size:13px;
+  cursor:pointer;
+  transition:background .15s;
+  backdrop-filter:blur(10px);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+}
+.btn:hover{
+  background:rgba(255,255,255,0.3);
+}
+.btn.secondary{
+  background:rgba(255,255,255,0.2);
+  color:#fff;
+  border:none;
+}
+.btn.secondary:hover{
+  background:rgba(255,255,255,0.3);
+}
+.back-btn{
+  position:fixed;
+  top:16px;
+  left:16px;
+  width:40px;
+  height:40px;
+  border:0;
+  border-radius:50%;
+  background:rgba(0,0,0,0.3);
+  color:#fff;
+  font-size:18px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:10;
+  backdrop-filter:blur(4px);
+}
+.back-btn:hover{
+  background:rgba(0,0,0,0.5);
+}
+</style>
+</head>
+<body>
+<button class="back-btn" onclick="history.back()"><i class="fa-solid fa-arrow-left"></i></button>
+<div class="profile-container">
+<div class="profile-bg" id="profileBg"></div>
+<div class="profile-header">
+<div class="profile-header-content">
+<div class="profile-avatar" id="profileAvatar"><i class="fa-solid fa-user"></i></div>
+<h1 class="profile-name" id="profileName">ユーザー名</h1>
+<p class="profile-username" id="profileUsername">@username</p>
+<div class="profile-status" id="profileStatus"><i class="fa-solid fa-circle" style="font-size:8px"></i> オンライン</div>
+</div>
+</div>
+<div class="profile-desc">
+<div class="profile-desc-title">プロフィール</div>
+<div class="profile-desc-text" id="profileDescText">プロフィール説明がありません</div>
+</div>
+<div class="profile-actions">
+<button class="btn"><i class="fa-solid fa-user-plus" style="font-size:18px"></i>フレンドに追加</button>
+<button class="btn secondary"><i class="fa-solid fa-comment" style="font-size:18px"></i>メッセージを送る</button>
+</div>
+</div>
+<script>
+const urlParams=new URLSearchParams(window.location.search);
+const userId=urlParams.get("id");
+
+async function loadProfile(){
+  if(!userId)return history.back();
+
+  try{
+    const r=await fetch(`/api/users/${userId}`,{credentials:"include"});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.error||"プロフィール読み込みエラー");
+
+    const user=d.user;
+
+    document.getElementById("profileName").textContent=user.display_name;
+    document.getElementById("profileUsername").textContent="@"+user.username;
+
+    if(user.profile_icon_url){
+      document.getElementById("profileAvatar").innerHTML=`<img src="${user.profile_icon_url}" alt="avatar">`;
+    }
+
+    if(user.profile_bg_url){
+      const bgEl=document.getElementById("profileBg");
+      bgEl.style.backgroundImage=`url('${user.profile_bg_url}')`;
+    }
+
+    const statusEl=document.getElementById("profileStatus");
+    statusEl.textContent=(user.online?"オンライン":"オフライン");
+    if(!user.online)statusEl.classList.add("offline");
+
+    const descEl=document.getElementById("profileDescText");
+    if(user.profile_desc){
+      descEl.textContent=user.profile_desc;
+    }else{
+      descEl.textContent="プロフィール説明がありません";
+      descEl.classList.add("profile-desc-empty");
+    }
+  }catch(e){
+    alert(e.message);
+    history.back();
+  }
+}
+
+loadProfile();
+</script>
+</body>
+</html>
