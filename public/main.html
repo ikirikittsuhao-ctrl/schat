@@ -39,7 +39,21 @@ button,input{
 button{cursor:pointer}
 .hidden{display:none!important}
 .app{height:100dvh;max-width:100%;margin:auto;display:flex;background:var(--surface);box-shadow:var(--shadow);position:relative}
-.sidebar{width:var(--sidebar-width);min-width:260px;max-width:600px;border-right:1px solid var(--border);display:flex;flex-direction:column;background:#fff;position:relative;user-select:none}
+.sidebar{width:var(--sidebar-width);min-width:260px;max-width:600px;border-right:1px solid var(--border);display:flex;flex-direction:column;background:#fff;position:relative;user-select:none;transition:width .2s ease}
+.sidebar.collapsed{width:70px!important;min-width:70px!important;max-width:70px!important}
+.sidebar.collapsed .brand-text,
+.sidebar.collapsed .top-actions,
+.sidebar.collapsed .search,
+.sidebar.collapsed .rooms,
+.sidebar.collapsed .nav-text,
+.sidebar.collapsed .invite-badge,
+.sidebar.collapsed .resizer{display:none!important}
+.sidebar.collapsed .topbar{justify-content:center;padding:0;gap:8px}
+.sidebar.collapsed .brand{justify-content:center}
+.sidebar.collapsed .brand i{margin-right:0}
+.sidebar.collapsed .nav{flex-direction:column;height:auto;padding:10px 0;gap:15px;align-items:center}
+.sidebar.collapsed .nav button{flex:none;width:100%;padding:10px 0}
+.sidebar.collapsed .nav button i{margin-bottom:0;font-size:22px}
 .resizer{width:5px;cursor:col-resize;position:absolute;right:-3px;top:0;bottom:0;z-index:20;background:transparent;transition:background .2s}
 .resizer:hover,.resizer.resizing{background:rgba(6,199,85,0.4)}
 .topbar{height:68px;padding:0 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:#fff}
@@ -308,7 +322,8 @@ button{cursor:pointer}
 <aside id="sidebar" class="sidebar">
 <div id="resizer" class="resizer"></div>
 <div class="topbar">
-<div class="brand"><i class="fa-solid fa-comments"></i>schat<span id="totalUnreadBadge" class="brand-unread hidden">0</span></div>
+<button class="icon" id="sidebarToggleBtn" title="サイドバーの切替" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
+<div class="brand"><i class="fa-solid fa-comments"></i><span class="brand-text">schat</span><span id="totalUnreadBadge" class="brand-unread hidden">0</span></div>
 <div class="top-actions">
 <button class="icon" title="フレンド追加" onclick="openFriend()"><i class="fa-solid fa-user-plus"></i></button>
 <button class="icon" title="グループ作成" onclick="openGroup()"><i class="fa-solid fa-users"></i></button>
@@ -317,9 +332,9 @@ button{cursor:pointer}
 <div class="search"><input id="search" placeholder="チャットを検索"></div>
 <div id="rooms" class="rooms"></div>
 <div class="nav">
-<button id="navChat" class="active" onclick="tab('chat')"><i class="fa-solid fa-message"></i>チャット</button>
-<button id="navFriends" onclick="tab('friends')"><i class="fa-solid fa-address-book"></i>フレンド<span id="inviteBadge" class="invite-badge hidden">0</span></button>
-<button id="navAccount" onclick="tab('account')"><i class="fa-solid fa-user"></i>アカウント</button>
+<button id="navChat" class="active" onclick="tab('chat')"><i class="fa-solid fa-message"></i><span class="nav-text">チャット</span></button>
+<button id="navFriends" onclick="tab('friends')"><i class="fa-solid fa-address-book"></i><span class="nav-text">フレンド</span><span id="inviteBadge" class="invite-badge hidden">0</span></button>
+<button id="navAccount" onclick="tab('account')"><i class="fa-solid fa-user"></i><span class="nav-text">アカウント</span></button>
 </div>
 </aside>
 <main id="main" class="main">
@@ -329,12 +344,7 @@ button{cursor:pointer}
 <div class="chat-head">
 <button class="icon back mobile-back" onclick="closeMain()"><i class="fa-solid fa-chevron-left"></i></button>
 <div id="chatTitle" class="chat-title">チャット</div>
-<div id="chatActions" class="chat-actions">
-<button class="icon" title="検索"><i class="fa-solid fa-magnifying-glass"></i></button>
-<button class="icon" title="通話"><i class="fa-solid fa-phone"></i></button>
-<button class="icon" title="カレンダー"><i class="fa-solid fa-calendar-days"></i></button>
-<button class="icon" title="メニュー"><i class="fa-solid fa-bars"></i></button>
-</div>
+<div id="chatActions" class="chat-actions"></div>
 </div>
 <div id="messages" class="messages"></div>
 <div id="replyBar" class="reply-bar"><div class="reply-bar-icon"><i class="fa-solid fa-reply"></i></div><div class="reply-bar-text" id="replyBarText"></div><button type="button" onclick="clearReply()" title="返信を解除"><i class="fa-solid fa-xmark"></i></button></div>
@@ -375,8 +385,13 @@ const sidebar = $("sidebar");
 const resizer = $("resizer");
 let isResizing = false;
 
+function toggleSidebar() {
+  sidebar.classList.toggle("collapsed");
+}
+
 if (resizer) {
   resizer.addEventListener("mousedown", (e) => {
+    if (sidebar.classList.contains("collapsed")) return;
     isResizing = true;
     resizer.classList.add("resizing");
     document.body.style.cursor = "col-resize";
@@ -627,19 +642,14 @@ $("chatTitle").textContent=activeRoom.name;
 }
 function renderChatActions(){
 const container=$("chatActions");
-container.innerHTML=`
-  <button class="icon" title="検索"><i class="fa-solid fa-magnifying-glass"></i></button>
-  <button class="icon" title="通話"><i class="fa-solid fa-phone"></i></button>
-  <button class="icon" title="カレンダー"><i class="fa-solid fa-calendar-days"></i></button>
-  <button class="icon" title="メニュー"><i class="fa-solid fa-bars"></i></button>
-`;
+container.innerHTML="";
 if(!activeRoom||activeRoom.type!=="group")return;
 const button=document.createElement("button");
 button.className="icon";
 button.title="グループに招待";
 button.innerHTML='<i class="fa-solid fa-user-plus"></i>';
 button.onclick=()=>openGroupInvite(activeRoom.id);
-container.insertBefore(button, container.firstChild);
+container.appendChild(button);
 }
 
 function appendMessage(m,scroll){
@@ -675,19 +685,19 @@ if (!isMe) {
   }
 }
 
-const actionButtonsHtml = isMe ? `
+const actionButtonsHtml = `
   <div class="msg-actions" style="display:none">
     <button onclick="setReplyTarget({id:'${m.id}',text:'${m.text.replace(/'/g,"\\'")}',sender_id:${m.sender_id},sender_name:'${m.sender_name.replace(/'/g,"\\'")}'})"><i class="fa-solid fa-reply"></i></button>
-    <button onclick="editMessage('${m.id}')"><i class="fa-solid fa-pen"></i></button>
-    <button onclick="deleteMessage('${m.id}')"><i class="fa-solid fa-trash"></i></button>
+    ${isMe ? `<button onclick="editMessage('${m.id}')"><i class="fa-solid fa-pen"></i></button>
+    <button onclick="deleteMessage('${m.id}')"><i class="fa-solid fa-trash"></i></button>` : ''}
   </div>
-` : '';
+`;
 
 row.innerHTML = `
   ${avatarHtml}
   <div class="msg-content-wrap">
     ${senderNameHtml}
-    <div class="msg ${isMe ? "me" : "other"}" data-message-id="${m.id}" data-reply-to-id="${m.reply_to_id || ""}" oncontextmenu="handleMessageLongPress(event,'${m.id}')">
+    <div class="msg ${isMe ? "me" : "other"}" data-message-id="${m.id}" data-reply-to-id="${m.reply_to_id || ""}" ondblclick="showMessageActions(this, {id:'${m.id}', sender_id:${m.sender_id}})">
       ${actionButtonsHtml}
       ${replyHtml}
       <span data-text-content>${escapeHTML(m.text).replace(/\n/g, "<br>")}</span>
@@ -696,75 +706,8 @@ row.innerHTML = `
   ${metaHtml}
 `;
 
-const msgBubble = row.querySelector(".msg");
-addSwipeReply(msgBubble, m);
-addLongPressHandler(msgBubble, m);
-
 $("messages").appendChild(row);
 if (scroll) scrollMessages();
-}
-
-function addSwipeReply(el,m){
-let startX=0,startY=0,moved=false;
-el.addEventListener("touchstart",e=>{const t=e.changedTouches[0];startX=t.clientX;startY=t.clientY;moved=false},{passive:true});
-el.addEventListener("touchmove",e=>{const t=e.changedTouches[0];if(Math.abs(t.clientX-startX)>12||Math.abs(t.clientY-startY)>12)moved=true},{passive:true});
-el.addEventListener("touchend",e=>{const t=e.changedTouches[0];const dx=t.clientX-startX;const dy=t.clientY-startY;if(moved&&dx<-60&&Math.abs(dx)>Math.abs(dy)*1.2)setReplyTarget(m)},{passive:true});
-let pointerDown=false;
-el.addEventListener("pointerdown",e=>{if(e.pointerType!=="touch")return;pointerDown=true;startX=e.clientX;startY=e.clientY});
-el.addEventListener("pointerup",e=>{if(!pointerDown||e.pointerType!=="touch")return;pointerDown=false;const dx=e.clientX-startX;const dy=e.clientY-startY;if(dx<-60&&Math.abs(dx)>Math.abs(dy)*1.2)setReplyTarget(m)});
-}
-
-function addLongPressHandler(el, m) {
-let touchStartTime = 0;
-let isLongPress = false;
-let longPressTimer = null;
-
-el.addEventListener("touchstart", (e) => {
-  touchStartTime = Date.now();
-  isLongPress = false;
-  longPressTimer = setTimeout(() => {
-    isLongPress = true;
-    if (m.sender_id === me.id) {
-      showMessageActions(el, m);
-    }
-  }, 500);
-}, {passive: true});
-
-el.addEventListener("touchend", () => {
-  clearTimeout(longPressTimer);
-}, {passive: true});
-
-el.addEventListener("touchmove", () => {
-  clearTimeout(longPressTimer);
-  isLongPress = false;
-}, {passive: true});
-
-el.addEventListener("mousedown", (e) => {
-  if (e.button !== 2) return;
-  touchStartTime = Date.now();
-  longPressTimer = setTimeout(() => {
-    if (m.sender_id === me.id) {
-      showMessageActions(el, m);
-    }
-  }, 300);
-});
-
-el.addEventListener("mouseup", () => {
-  clearTimeout(longPressTimer);
-});
-
-el.addEventListener("mousemove", () => {
-  clearTimeout(longPressTimer);
-});
-}
-
-function handleMessageLongPress(event, messageId) {
-event.preventDefault();
-const m = {id: messageId};
-const el = event.target.closest(".msg");
-if (m.sender_id === me.id) {
-  showMessageActions(el, m);
-}
 }
 
 function showMessageActions(el, m) {
